@@ -189,50 +189,106 @@ function deleteSelected(selectedIds) {
 function renderCalendar() {
   const root = document.querySelector("#calendarRoot");
   const months = collectMonths(state.events);
-
-  root.innerHTML = months
-    .map(({ year, month }) => renderMonth(year, month))
-    .join("");
+  root.innerHTML = months.map(({ year, month }) => renderMonth(year, month)).join("");
 }
 
 function renderMonth(year, month) {
   const first = new Date(year, month - 1, 1);
   const last = new Date(year, month, 0);
-  const firstOffset = (first.getDay() + 6) % 7;
+  const firstOffset = first.getDay();
   const totalCells = Math.ceil((firstOffset + last.getDate()) / 7) * 7;
-
-  const cells = [];
-  for (let i = 0; i < totalCells; i += 1) {
-    const dayNum = i - firstOffset + 1;
-    if (dayNum < 1 || dayNum > last.getDate()) {
-      cells.push('<div class="day-cell"></div>');
-      continue;
+  const weeks = [];
+  for (let w = 0; w < totalCells / 7; w += 1) {
+    const days = [];
+    for (let d = 0; d < 7; d += 1) {
+      const i = w * 7 + d;
+      const dayNum = i - firstOffset + 1;
+      const inMonth = dayNum >= 1 && dayNum <= last.getDate();
+      const dateObj = inMonth
+        ? new Date(year, month - 1, dayNum)
+        : new Date(year, month - 1, dayNum < 1 ? dayNum : dayNum);
+      days.push({
+        inMonth,
+        dayNum: dateObj.getDate(),
+        date: toISO(dateObj.getFullYear(), dateObj.getMonth() + 1, dateObj.getDate())
+      });
     }
-
-    const date = toISO(year, month, dayNum);
-    const chips = state.events
-      .filter((event) => event.start <= date && event.end >= date)
-      .map((event) => {
-        const interviewClass = event.interview === date ? "interview" : "";
-        return `<span class="chip ${interviewClass}" style="background:${event.fill};color:${event.ink}" title="${event.name}">${event.name}</span>`;
-      })
-      .join("");
-
-    cells.push(`
-      <div class="day-cell">
-        <div class="day-number">${dayNum}</div>
-        ${chips}
-      </div>
-    `);
+    weeks.push(days);
   }
+
+  const weekRows = weeks
+    .map((weekDays) => {
+      const weekStart = weekDays[0].date;
+      const weekEnd = weekDays[6].date;
+      const minInMonthIdx = weekDays.findIndex((day) => day.inMonth);
+      const maxInMonthIdx = 6 - [...weekDays].reverse().findIndex((day) => day.inMonth);
+      const orderedEvents = [...state.events].sort(
+        (a, b) => a.start.localeCompare(b.start) || a.name.localeCompare(b.name)
+      );
+      const segments = state.events
+        .filter((event) => !(event.end < weekStart || event.start > weekEnd))
+        .map((event) => {
+          const startIdx = Math.max(0, diffDays(new Date(weekStart), new Date(event.start)));
+          const endIdx = Math.min(6, diffDays(new Date(weekStart), new Date(event.end)));
+          const orderIndex = orderedEvents.findIndex((item) => item.id === event.id);
+          return { event, startIdx, endIdx, orderIndex };
+        })
+        .sort((a, b) => a.orderIndex - b.orderIndex);
+
+      const placed = segments.map((segment, laneIndex) => ({ ...segment, laneIndex }));
+
+      const bars = placed
+        .map(({ event, startIdx, endIdx, laneIndex }) => {
+          const visibleStart = Math.max(startIdx, minInMonthIdx);
+          const visibleEnd = endIdx;
+          if (visibleStart > visibleEnd) return "";
+
+          const span = Math.max(1, visibleEnd - visibleStart + 1);
+          const showInterview = event.interview >= weekStart && event.interview <= weekEnd;
+          const startsThisWeek = event.start >= weekStart && event.start <= weekEnd;
+          const showName = startsThisWeek || !showInterview;
+          const interviewPos = showInterview
+            ? Math.max(0, diffDays(new Date(weekStart), new Date(event.interview)))
+            : 0;
+          const interviewOffset = interviewPos - visibleStart + 0.5;
+          const interviewLeftInBar = (interviewOffset / span) * 100;
+
+          return `
+            <div class="week-bar" style="--start:${visibleStart};--span:${span};--lane:${laneIndex};background:${event.fill};color:${event.ink}">
+              ${showName ? `<span class="week-bar-text">${event.name}</span>` : ""}
+              ${showInterview ? `<span class="week-interview-tag" style="left:${interviewLeftInBar}%;background:${event.fill};color:${event.ink};border-color:${event.ink}">面談開始</span>` : ""}
+            </div>
+          `;
+        })
+        .join("");
+
+      const dayCells = weekDays
+        .map((day) => {
+          return `
+          <div class="day-cell ${day.inMonth ? "" : "muted"}">
+            <div class="day-number">${day.inMonth ? day.dayNum : ""}</div>
+          </div>
+        `;
+        })
+        .join("");
+
+      const barsHeight = Math.max(26, placed.length * 18 + 8);
+      return `
+        <div class="week-block">
+          <div class="day-grid">${dayCells}</div>
+          <div class="week-bars" style="height:${barsHeight}px">${bars}</div>
+        </div>
+      `;
+    })
+    .join("");
 
   return `
     <section class="month-block">
       <h3 class="month-title">${year}年${month}月</h3>
       <div class="week-header">
-        <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div><div>日</div>
+        <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
       </div>
-      <div class="day-grid">${cells.join("")}</div>
+      <div class="month-weeks">${weekRows}</div>
     </section>
   `;
 }
@@ -249,7 +305,6 @@ function collectMonths(events) {
 
   const minStart = [...events].sort((a, b) => a.start.localeCompare(b.start))[0].start;
   const maxEnd = [...events].sort((a, b) => b.end.localeCompare(a.end))[0].end;
-
   const start = new Date(minStart);
   const end = new Date(maxEnd);
   const endWithNextMonth = new Date(end.getFullYear(), end.getMonth() + 1, 1);
@@ -354,3 +409,10 @@ function makeId() {
   }
   return `event-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
+
+function diffDays(fromDate, toDate) {
+  const fromUtc = Date.UTC(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  const toUtc = Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+  return Math.floor((toUtc - fromUtc) / 86400000);
+}
+
