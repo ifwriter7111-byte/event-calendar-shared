@@ -503,7 +503,9 @@ function loadEvents() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return seedEvents;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : seedEvents;
+    if (!Array.isArray(parsed)) return seedEvents;
+    const normalized = parsed.map(normalizeEvent).filter(Boolean);
+    return normalized.length > 0 ? normalized : seedEvents;
   } catch {
     return seedEvents;
   }
@@ -547,6 +549,27 @@ function makeId() {
     return globalThis.crypto.randomUUID();
   }
   return `event-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeEvent(input) {
+  if (!input || typeof input !== "object") return null;
+  const id = typeof input.id === "string" && input.id ? input.id : makeId();
+  const name = typeof input.name === "string" ? input.name.trim() : "";
+  const start = typeof input.start === "string" ? input.start : "";
+  const end = typeof input.end === "string" ? input.end : "";
+  const interview = typeof input.interview === "string" ? input.interview : "";
+  const fill = typeof input.fill === "string" && input.fill ? input.fill : "#dff4dc";
+  const ink = typeof input.ink === "string" && input.ink ? input.ink : "#255725";
+
+  if (!name || !isIsoDate(start) || !isIsoDate(end) || !isIsoDate(interview)) return null;
+  if (start > end) return null;
+  if (interview < start || interview > end) return null;
+
+  return { id, name, start, end, interview, fill, ink };
+}
+
+function isIsoDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function diffDays(fromDate, toDate) {
