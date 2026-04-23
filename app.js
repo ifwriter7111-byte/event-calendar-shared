@@ -1,9 +1,14 @@
-const STORAGE_KEY = "schedule-events-v2";
+const STORAGE_KEY = "schedule-events-v3";
 
 const seedEvents = [
   { id: makeId(), name: "デベロゴン", start: "2026-04-01", end: "2026-04-19", interview: "2026-04-11", fill: "#dff4dc", ink: "#255725" },
   { id: makeId(), name: "ブイプロ", start: "2026-04-18", end: "2026-04-27", interview: "2026-04-24", fill: "#e0edf8", ink: "#1f4b77" },
-  { id: makeId(), name: "なおき", start: "2026-04-18", end: "2026-04-27", interview: "2026-04-25", fill: "#f6e9d7", ink: "#7b4f1f" }
+  { id: makeId(), name: "なおき", start: "2026-04-18", end: "2026-04-27", interview: "2026-04-25", fill: "#f6e9d7", ink: "#7b4f1f" },
+  { id: makeId(), name: "ぴよまる", start: "2026-04-27", end: "2026-05-06", interview: "2026-05-02", fill: "#f8e8f1", ink: "#7a3a65" },
+  { id: makeId(), name: "チョーさん", start: "2026-04-26", end: "2026-05-10", interview: "2026-05-04", fill: "#e6f6ef", ink: "#1e6a4a" },
+  { id: makeId(), name: "アドネス", start: "2026-04-30", end: "2026-05-17", interview: "2026-05-09", fill: "#efe9fb", ink: "#4b3a7f" },
+  { id: makeId(), name: "みおさん", start: "2026-06-01", end: "2026-06-14", interview: "2026-06-07", fill: "#e9f3fb", ink: "#2f5f85" },
+  { id: makeId(), name: "りんださん", start: "2026-06-14", end: "2026-06-28", interview: "2026-06-21", fill: "#fdf0e4", ink: "#8a4f1f" }
 ];
 
 const state = { events: loadEvents(), editingId: null };
