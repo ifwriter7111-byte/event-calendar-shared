@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>イベントカレンダー</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="page-header">
+      <h1>イベントカレンダー</h1>
+      <p>一覧確認と月カレンダー表示。右側フォームから追加・編集できます。</p>
+    </header>
+
+    <section class="layout">
+      <div class="left-pane">
+        <section class="card">
+          <h2>イベント一覧</h2>
+          <div id="eventList"></div>
+        </section>
+        <section class="card">
+          <h2>月表示</h2>
+          <div id="calendarRoot"></div>
+        </section>
+      </div>
+
+      <aside class="card form-pane">
+        <h2 id="formTitle">イベント追加</h2>
+        <form id="eventForm">
+          <input type="hidden" id="eventId" />
+
+          <label>名前
+            <input id="name" required />
+          </label>
+          <label>開始日
+            <input id="start" type="date" required />
+          </label>
+          <label>終了日
+            <input id="end" type="date" required />
+          </label>
+          <label>面談開始日
+            <input id="interview" type="date" required />
+          </label>
+          <label>帯の背景色
+            <input id="fill" type="color" value="#dff4dc" />
+          </label>
+          <label>文字色
+            <input id="ink" type="color" value="#255725" />
+          </label>
+
+          <div class="buttons">
+            <button type="submit" id="submitButton">追加する</button>
+            <button type="button" id="resetButton" class="secondary">入力をクリア</button>
+            <button type="button" id="deleteButton" class="danger hidden">削除する</button>
+          </div>
+        </form>
+      </aside>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

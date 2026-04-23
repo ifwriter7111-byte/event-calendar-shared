@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: event-calendar-shared
+    runtime: python
+    buildCommand: "python3 --version"
+    startCommand: "python3 server.py"
