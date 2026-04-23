@@ -114,7 +114,11 @@ function renderEventList() {
       <tr data-id="${event.id}">
         <td class="check-cell"><input type="checkbox" class="row-check" data-id="${event.id}" /></td>
         <td><span class="name-badge" style="background:${event.fill};color:${event.ink}">${event.name}</span></td>
-        <td>${formatDateWithWeekday(event.start)} 〜 ${formatDateWithWeekday(event.end)}</td>
+        <td class="period-cell">
+          <span class="period-date">${formatDateWithWeekday(event.start)}</span>
+          <span class="period-sep">〜</span>
+          <span class="period-date">${formatDateWithWeekday(event.end)}</span>
+        </td>
         <td>${formatDateWithWeekday(event.interview)}</td>
       </tr>`;
     })

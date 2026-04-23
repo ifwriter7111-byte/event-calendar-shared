@@ -65,6 +65,22 @@ body {
   font-weight: 600;
 }
 
+.period-cell {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.period-date {
+  display: inline-block;
+  min-width: 74px;
+}
+
+.period-sep {
+  display: inline-block;
+  width: 18px;
+  text-align: center;
+}
+
 .check-cell {
   width: 72px;
   text-align: center;
