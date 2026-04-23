@@ -58,6 +58,14 @@ body {
   cursor: pointer;
 }
 
+.event-table tr[draggable="true"] {
+  cursor: grab;
+}
+
+.event-table tr.dragging {
+  opacity: 0.55;
+}
+
 .name-badge {
   display: inline-block;
   padding: 2px 8px;
@@ -200,16 +208,15 @@ body {
   text-overflow: ellipsis;
 }
 
-.week-bar-end-name {
+.week-end-name-tag {
   position: absolute;
   transform: translateX(2px);
-  top: 0;
   display: inline-block;
-  max-width: calc(100% - 4px);
+  max-width: calc((100% / 7) - 4px);
   line-height: 14px;
   font-size: 10px;
   font-weight: 400;
-  background: inherit;
+  border-radius: 2px;
   padding: 0 2px;
   text-align: left;
   overflow: hidden;

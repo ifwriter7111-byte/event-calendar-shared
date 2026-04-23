@@ -12,6 +12,7 @@ const seedEvents = [
 ];
 
 const state = { events: loadEvents(), editingId: null };
+let dragSourceId = null;
 
 const form = document.querySelector("#eventForm");
 const formTitle = document.querySelector("#formTitle");
@@ -108,10 +109,9 @@ function renderAll() {
 function renderEventList() {
   const root = document.querySelector("#eventList");
   const rows = [...state.events]
-    .sort((a, b) => a.start.localeCompare(b.start))
     .map((event) => {
       return `
-      <tr data-id="${event.id}">
+      <tr data-id="${event.id}" draggable="true">
         <td class="check-cell"><input type="checkbox" class="row-check" data-id="${event.id}" /></td>
         <td><span class="name-badge" style="background:${event.fill};color:${event.ink}">${event.name}</span></td>
         <td class="period-cell">
@@ -166,8 +166,52 @@ function renderEventList() {
   });
 
   root.querySelectorAll("tbody tr").forEach((row) => {
+    row.addEventListener("dragstart", onRowDragStart);
+    row.addEventListener("dragover", onRowDragOver);
+    row.addEventListener("drop", onRowDrop);
+    row.addEventListener("dragend", onRowDragEnd);
     row.addEventListener("click", () => startEdit(row.dataset.id));
   });
+}
+
+function onRowDragStart(e) {
+  const row = e.currentTarget;
+  dragSourceId = row.dataset.id;
+  row.classList.add("dragging");
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", dragSourceId);
+  }
+}
+
+function onRowDragOver(e) {
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+}
+
+function onRowDrop(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.id;
+  if (!dragSourceId || !targetId || dragSourceId === targetId) return;
+  reorderEvent(dragSourceId, targetId);
+}
+
+function onRowDragEnd(e) {
+  e.currentTarget.classList.remove("dragging");
+  dragSourceId = null;
+}
+
+function reorderEvent(sourceId, targetId) {
+  const currentOrder = state.events.map((event) => event.id);
+  const sourceIndex = currentOrder.findIndex((id) => id === sourceId);
+  const targetIndex = currentOrder.findIndex((id) => id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return;
+  const [movedId] = currentOrder.splice(sourceIndex, 1);
+  currentOrder.splice(targetIndex, 0, movedId);
+  const eventById = new Map(state.events.map((event) => [event.id, event]));
+  state.events = currentOrder.map((id) => eventById.get(id)).filter(Boolean);
+  saveEvents();
+  renderAll();
 }
 
 function deleteSelected(selectedIds) {
@@ -260,14 +304,16 @@ function renderMonth(year, month) {
           const interviewOffset = interviewPos - visibleStart + 0.5;
           const interviewLeftInBar = (interviewOffset / span) * 100;
           const showEndFallbackName = isWeekStartLabel && interviewOverlapsNameAtStart;
-          const endFallbackLeftInBar = ((span - 1) / span) * 100;
+          const endCellIndex = Math.min(visibleEnd, endIdx);
+          const endCellLeft = (endCellIndex / 7) * 100;
+          const endNameTop = laneIndex * 16 + 2;
 
           return `
             <div class="week-bar" style="--start:${visibleStart};--span:${span};--lane:${laneIndex};background:${event.fill};color:${event.ink}">
               ${showName ? `<span class="week-bar-text">${event.name}</span>` : ""}
-              ${showEndFallbackName ? `<span class="week-bar-end-name" style="left:${endFallbackLeftInBar}%">${event.name}</span>` : ""}
               ${showInterview ? `<span class="week-interview-tag" style="left:${interviewLeftInBar}%;background:${event.fill};color:${event.ink};border-color:${event.ink}">面談開始</span>` : ""}
             </div>
+            ${showEndFallbackName ? `<span class="week-end-name-tag" style="left:${endCellLeft}%;top:${endNameTop}px;background:${event.fill};color:${event.ink}">${event.name}</span>` : ""}
           `;
         })
         .join("");
@@ -368,6 +414,7 @@ function loadEvents() {
   }
 }
 
+
 function saveEvents() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events));
@@ -375,6 +422,7 @@ function saveEvents() {
     alert("ブラウザ保存に失敗しました。");
   }
 }
+
 
 function makeId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
