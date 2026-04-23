@@ -19,16 +19,10 @@ const eventIdInput = document.querySelector("#eventId");
 const submitButton = document.querySelector("#submitButton");
 const deleteButton = document.querySelector("#deleteButton");
 const resetButton = document.querySelector("#resetButton");
-const exportButton = document.querySelector("#exportButton");
-const importButton = document.querySelector("#importButton");
-const importFileInput = document.querySelector("#importFileInput");
 
 form.addEventListener("submit", onSubmit);
 resetButton.addEventListener("click", clearForm);
 deleteButton.addEventListener("click", onDelete);
-exportButton.addEventListener("click", onExport);
-importButton.addEventListener("click", () => importFileInput.click());
-importFileInput.addEventListener("change", onImport);
 
 renderAll();
 
@@ -119,9 +113,9 @@ function renderEventList() {
       return `
       <tr data-id="${event.id}">
         <td class="check-cell"><input type="checkbox" class="row-check" data-id="${event.id}" /></td>
-        <td>${event.name}</td>
-        <td>${formatDate(event.start)} 〜 ${formatDate(event.end)}</td>
-        <td>${formatDate(event.interview)}</td>
+        <td><span class="name-badge" style="background:${event.fill};color:${event.ink}">${event.name}</span></td>
+        <td>${formatDateWithWeekday(event.start)} 〜 ${formatDateWithWeekday(event.end)}</td>
+        <td>${formatDateWithWeekday(event.interview)}</td>
       </tr>`;
     })
     .join("");
@@ -195,8 +189,10 @@ function renderCalendar() {
 function renderMonth(year, month) {
   const first = new Date(year, month - 1, 1);
   const last = new Date(year, month, 0);
-  const firstOffset = first.getDay();
+  const firstOffset = (first.getDay() + 6) % 7;
   const totalCells = Math.ceil((firstOffset + last.getDate()) / 7) * 7;
+  const today = new Date();
+  const todayIso = toISO(today.getFullYear(), today.getMonth() + 1, today.getDate());
   const weeks = [];
   for (let w = 0; w < totalCells / 7; w += 1) {
     const days = [];
@@ -246,10 +242,11 @@ function renderMonth(year, month) {
           const span = Math.max(1, visibleEnd - visibleStart + 1);
           const showInterview = event.interview >= weekStart && event.interview <= weekEnd;
           const startsThisWeek = event.start >= weekStart && event.start <= weekEnd;
+          const continuesFromPrevMonth = startIdx < minInMonthIdx && visibleStart === minInMonthIdx;
           const interviewPos = showInterview
             ? Math.max(0, diffDays(new Date(weekStart), new Date(event.interview)))
             : 0;
-          const isWeekStartLabel = visibleStart === 0 || startsThisWeek;
+          const isWeekStartLabel = visibleStart === 0 || startsThisWeek || continuesFromPrevMonth;
           const interviewOverlapsNameAtStart = showInterview && interviewPos === visibleStart;
           const showName = isWeekStartLabel && !interviewOverlapsNameAtStart;
           const interviewOffset = interviewPos - visibleStart + 0.5;
@@ -267,18 +264,22 @@ function renderMonth(year, month) {
       const dayCells = weekDays
         .map((day) => {
           return `
-          <div class="day-cell ${day.inMonth ? "" : "muted"}">
+          <div class="day-cell ${day.inMonth ? "" : "muted"} ${day.date === todayIso ? "today-day" : ""}">
             <div class="day-number">${day.inMonth ? day.dayNum : ""}</div>
           </div>
         `;
         })
         .join("");
 
+      const todayIdx = weekDays.findIndex((day) => day.date === todayIso);
       const barsHeight = Math.max(26, placed.length * 18 + 8);
       return `
         <div class="week-block">
           <div class="day-grid">${dayCells}</div>
-          <div class="week-bars" style="height:${barsHeight}px">${bars}</div>
+          <div class="week-bars ${todayIdx >= 0 ? "has-today" : ""}" style="height:${barsHeight}px;--today-idx:${todayIdx}">
+            ${todayIdx >= 0 ? '<div class="today-column"></div>' : ""}
+            ${bars}
+          </div>
         </div>
       `;
     })
@@ -288,7 +289,7 @@ function renderMonth(year, month) {
     <section class="month-block">
       <h3 class="month-title">${year}年${month}月</h3>
       <div class="week-header">
-        <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
+        <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div><div>日</div>
       </div>
       <div class="month-weeks">${weekRows}</div>
     </section>
@@ -339,6 +340,12 @@ function formatDate(iso) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+function formatDateWithWeekday(iso) {
+  const d = new Date(iso);
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+  return `${d.getMonth() + 1}/${d.getDate()}(${weekdays[d.getDay()]})`;
+}
+
 function loadEvents() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -356,53 +363,6 @@ function saveEvents() {
   } catch {
     alert("ブラウザ保存に失敗しました。");
   }
-}
-
-function onExport() {
-  const data = JSON.stringify(state.events, null, 2);
-  const blob = new Blob([data], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "events.json";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-async function onImport(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) throw new Error("invalid format");
-    state.events = parsed.map(normalizeEvent).filter(Boolean);
-    saveEvents();
-    renderAll();
-    clearForm();
-    alert("JSONを読み込みました。");
-  } catch {
-    alert("JSONの読み込みに失敗しました。");
-  } finally {
-    importFileInput.value = "";
-  }
-}
-
-function normalizeEvent(event) {
-  if (!event || typeof event !== "object") return null;
-  const required = ["name", "start", "end", "interview"];
-  for (const key of required) {
-    if (!event[key]) return null;
-  }
-  return {
-    id: event.id || makeId(),
-    name: String(event.name),
-    start: String(event.start),
-    end: String(event.end),
-    interview: String(event.interview),
-    fill: event.fill || "#dff4dc",
-    ink: event.ink || "#255725"
-  };
 }
 
 function makeId() {
