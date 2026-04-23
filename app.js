@@ -260,11 +260,12 @@ function renderMonth(year, month) {
           const interviewOffset = interviewPos - visibleStart + 0.5;
           const interviewLeftInBar = (interviewOffset / span) * 100;
           const showEndFallbackName = isWeekStartLabel && interviewOverlapsNameAtStart;
+          const endFallbackLeftInBar = ((span - 1) / span) * 100;
 
           return `
             <div class="week-bar" style="--start:${visibleStart};--span:${span};--lane:${laneIndex};background:${event.fill};color:${event.ink}">
               ${showName ? `<span class="week-bar-text">${event.name}</span>` : ""}
-              ${showEndFallbackName ? `<span class="week-bar-end-name">${event.name}</span>` : ""}
+              ${showEndFallbackName ? `<span class="week-bar-end-name" style="left:${endFallbackLeftInBar}%">${event.name}</span>` : ""}
               ${showInterview ? `<span class="week-interview-tag" style="left:${interviewLeftInBar}%;background:${event.fill};color:${event.ink};border-color:${event.ink}">面談開始</span>` : ""}
             </div>
           `;
