@@ -202,13 +202,16 @@ body {
 
 .week-bar-end-name {
   position: absolute;
-  right: 4px;
+  left: calc(100% - (100% / var(--span)) + 2px);
   top: 0;
+  display: inline-block;
+  min-width: 56px;
   line-height: 14px;
   font-size: 10px;
   font-weight: 400;
   background: inherit;
-  padding-left: 4px;
+  padding: 0 4px;
+  text-align: left;
 }
 
 .week-interview-tag {
