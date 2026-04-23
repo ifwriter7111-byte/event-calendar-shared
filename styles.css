@@ -124,13 +124,14 @@ body {
 .week-header div {
   text-align: center;
   font-size: 12px;
-  color: #557055;
+  color: #3f5840;
+  font-weight: 600;
   margin-bottom: 4px;
 }
 
 .day-cell {
   min-height: 32px;
-  border: 1px solid #e8efe6;
+  border: 1px solid #d4dfd1;
   padding: 4px;
 }
 
@@ -146,7 +147,8 @@ body {
 
 .day-number {
   font-size: 12px;
-  color: #556655;
+  color: #3f5140;
+  font-weight: 600;
   margin-bottom: 4px;
   display: inline-block;
   min-width: 20px;
@@ -164,13 +166,13 @@ body {
 }
 
 .week-block {
-  border: 1px solid #ecf2ea;
+  border: 1px solid #d8e3d6;
 }
 
 .week-bars {
   position: relative;
-  border-top: 1px solid #ecf2ea;
-  background-image: linear-gradient(to right, rgba(96, 128, 96, 0.12) 1px, transparent 1px);
+  border-top: 1px solid #d8e3d6;
+  background-image: linear-gradient(to right, rgba(90, 120, 90, 0.18) 1px, transparent 1px);
   background-size: calc(100% / 7) 100%;
 }
 
