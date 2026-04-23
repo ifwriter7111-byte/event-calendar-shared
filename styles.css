@@ -124,6 +124,8 @@ body {
 
 .day-cell.today-day {
   background: #fff7f7;
+  border: 3px solid #d85a5a;
+  box-shadow: inset 0 0 0 1px #ffffff;
 }
 
 .day-number {
@@ -136,12 +138,8 @@ body {
 }
 
 .day-cell.today-day .day-number {
-  border: 3px solid #d85a5a;
-  border-radius: 4px;
   color: #8a2f2f;
   font-weight: 700;
-  background: #ffffff;
-  padding: 0 4px;
 }
 
 .month-weeks {
