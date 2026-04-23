@@ -235,7 +235,11 @@ function renderMonth(year, month) {
 function collectMonths(events) {
   if (events.length === 0) {
     const now = new Date();
-    return [{ year: now.getFullYear(), month: now.getMonth() + 1 }];
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return [
+      { year: now.getFullYear(), month: now.getMonth() + 1 },
+      { year: next.getFullYear(), month: next.getMonth() + 1 }
+    ];
   }
 
   const minStart = [...events].sort((a, b) => a.start.localeCompare(b.start))[0].start;
@@ -243,11 +247,15 @@ function collectMonths(events) {
 
   const start = new Date(minStart);
   const end = new Date(maxEnd);
+  const endWithNextMonth = new Date(end.getFullYear(), end.getMonth() + 1, 1);
   const result = [];
 
   let year = start.getFullYear();
   let month = start.getMonth() + 1;
-  while (year < end.getFullYear() || (year === end.getFullYear() && month <= end.getMonth() + 1)) {
+  while (
+    year < endWithNextMonth.getFullYear() ||
+    (year === endWithNextMonth.getFullYear() && month <= endWithNextMonth.getMonth() + 1)
+  ) {
     result.push({ year, month });
     month += 1;
     if (month > 12) {
