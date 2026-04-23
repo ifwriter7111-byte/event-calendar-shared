@@ -22,6 +22,13 @@ body {
   margin: 0 0 8px;
 }
 
+.top-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 2fr 1fr;

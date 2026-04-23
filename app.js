@@ -1,9 +1,12 @@
-const API_BASE = "/api/events";
+const STORAGE_KEY = "schedule-events-v2";
 
-const state = {
-  events: [],
-  editingId: null
-};
+const seedEvents = [
+  { id: makeId(), name: "デベロゴン", start: "2026-04-01", end: "2026-04-19", interview: "2026-04-11", fill: "#dff4dc", ink: "#255725" },
+  { id: makeId(), name: "ブイプロ", start: "2026-04-18", end: "2026-04-27", interview: "2026-04-24", fill: "#e0edf8", ink: "#1f4b77" },
+  { id: makeId(), name: "なおき", start: "2026-04-18", end: "2026-04-27", interview: "2026-04-25", fill: "#f6e9d7", ink: "#7b4f1f" }
+];
+
+const state = { events: loadEvents(), editingId: null };
 
 const form = document.querySelector("#eventForm");
 const formTitle = document.querySelector("#formTitle");
@@ -11,62 +14,40 @@ const eventIdInput = document.querySelector("#eventId");
 const submitButton = document.querySelector("#submitButton");
 const deleteButton = document.querySelector("#deleteButton");
 const resetButton = document.querySelector("#resetButton");
+const exportButton = document.querySelector("#exportButton");
+const importButton = document.querySelector("#importButton");
+const importFileInput = document.querySelector("#importFileInput");
 
 form.addEventListener("submit", onSubmit);
 resetButton.addEventListener("click", clearForm);
 deleteButton.addEventListener("click", onDelete);
+exportButton.addEventListener("click", onExport);
+importButton.addEventListener("click", () => importFileInput.click());
+importFileInput.addEventListener("change", onImport);
 
-init();
+renderAll();
 
-async function init() {
-  await reloadEvents();
-  renderAll();
-}
-
-async function onSubmit(e) {
+function onSubmit(e) {
   e.preventDefault();
 
   const payload = collectFormValues();
   if (!payload) return;
 
-  try {
-    if (state.editingId) {
-      const res = await fetch(`${API_BASE}/${state.editingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error("update failed");
-    } else {
-      const res = await fetch(API_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error("create failed");
-    }
-  } catch {
-    alert("保存に失敗しました。サーバー接続を確認してください。");
-    return;
+  if (state.editingId) {
+    state.events = state.events.map((event) => (event.id === state.editingId ? { ...event, ...payload } : event));
+  } else {
+    state.events.push({ id: makeId(), ...payload });
   }
 
-  await reloadEvents();
+  saveEvents();
   renderAll();
   clearForm();
 }
 
-async function onDelete() {
+function onDelete() {
   if (!state.editingId) return;
-
-  try {
-    const res = await fetch(`${API_BASE}/${state.editingId}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("delete failed");
-  } catch {
-    alert("削除に失敗しました。サーバー接続を確認してください。");
-    return;
-  }
-
-  await reloadEvents();
+  state.events = state.events.filter((event) => event.id !== state.editingId);
+  saveEvents();
   renderAll();
   clearForm();
 }
@@ -186,29 +167,18 @@ function renderEventList() {
   });
 }
 
-async function deleteSelected(selectedIds) {
-    if (selectedIds.length === 0) {
-      alert("削除するイベントを選択してください。");
-      return;
-    }
-    const ok = confirm(`${selectedIds.length}件のイベントを削除します。よろしいですか？`);
-    if (!ok) return;
+function deleteSelected(selectedIds) {
+  if (selectedIds.length === 0) {
+    alert("削除するイベントを選択してください。");
+    return;
+  }
+  const ok = confirm(`${selectedIds.length}件のイベントを削除します。よろしいですか？`);
+  if (!ok) return;
 
-    try {
-      const res = await fetch(API_BASE, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selectedIds })
-      });
-      if (!res.ok) throw new Error("bulk delete failed");
-    } catch {
-      alert("一括削除に失敗しました。サーバー接続を確認してください。");
-      return;
-    }
-
-    if (state.editingId && selectedIds.includes(state.editingId)) clearForm();
-    await reloadEvents();
-    renderAll();
+  state.events = state.events.filter((event) => !selectedIds.includes(event.id));
+  if (state.editingId && selectedIds.includes(state.editingId)) clearForm();
+  saveEvents();
+  renderAll();
 }
 
 function renderCalendar() {
@@ -299,14 +269,75 @@ function formatDate(iso) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-async function reloadEvents() {
+function loadEvents() {
   try {
-    const res = await fetch(API_BASE);
-    if (!res.ok) throw new Error("request failed");
-    const data = await res.json();
-    state.events = Array.isArray(data.events) ? data.events : [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return seedEvents;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : seedEvents;
   } catch {
-    alert("イベント取得に失敗しました。server.py を起動して再読み込みしてください。");
-    state.events = [];
+    return seedEvents;
   }
+}
+
+function saveEvents() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events));
+  } catch {
+    alert("ブラウザ保存に失敗しました。");
+  }
+}
+
+function onExport() {
+  const data = JSON.stringify(state.events, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "events.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function onImport(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) throw new Error("invalid format");
+    state.events = parsed.map(normalizeEvent).filter(Boolean);
+    saveEvents();
+    renderAll();
+    clearForm();
+    alert("JSONを読み込みました。");
+  } catch {
+    alert("JSONの読み込みに失敗しました。");
+  } finally {
+    importFileInput.value = "";
+  }
+}
+
+function normalizeEvent(event) {
+  if (!event || typeof event !== "object") return null;
+  const required = ["name", "start", "end", "interview"];
+  for (const key of required) {
+    if (!event[key]) return null;
+  }
+  return {
+    id: event.id || makeId(),
+    name: String(event.name),
+    start: String(event.start),
+    end: String(event.end),
+    interview: String(event.interview),
+    fill: event.fill || "#dff4dc",
+    ink: event.ink || "#255725"
+  };
+}
+
+function makeId() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `event-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
