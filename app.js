@@ -231,18 +231,22 @@ function renderMonth(year, month) {
           const startIdx = Math.max(0, diffDays(new Date(weekStart), new Date(event.start)));
           const endIdx = Math.min(6, diffDays(new Date(weekStart), new Date(event.end)));
           const orderIndex = orderedEvents.findIndex((item) => item.id === event.id);
-          return { event, startIdx, endIdx, orderIndex };
+          const visibleStart = Math.max(startIdx, minInMonthIdx);
+          const visibleEnd = endIdx;
+          return { event, startIdx, endIdx, visibleStart, visibleEnd, orderIndex };
         })
+        .filter((segment) => segment.visibleStart <= segment.visibleEnd)
         .sort((a, b) => a.orderIndex - b.orderIndex);
 
       const placed = segments.map((segment, laneIndex) => ({ ...segment, laneIndex }));
+      return { weekDays, weekStart, weekEnd, minInMonthIdx, maxInMonthIdx, placed };
+    });
+
+  const renderedWeekRows = weekRows
+    .map(({ weekDays, weekStart, weekEnd, minInMonthIdx, placed }) => {
 
       const bars = placed
-        .map(({ event, startIdx, endIdx, laneIndex }) => {
-          const visibleStart = Math.max(startIdx, minInMonthIdx);
-          const visibleEnd = endIdx;
-          if (visibleStart > visibleEnd) return "";
-
+        .map(({ event, startIdx, endIdx, visibleStart, visibleEnd, laneIndex }) => {
           const span = Math.max(1, visibleEnd - visibleStart + 1);
           const showInterview = event.interview >= weekStart && event.interview <= weekEnd;
           const startsThisWeek = event.start >= weekStart && event.start <= weekEnd;
@@ -255,10 +259,12 @@ function renderMonth(year, month) {
           const showName = isWeekStartLabel && !interviewOverlapsNameAtStart;
           const interviewOffset = interviewPos - visibleStart + 0.5;
           const interviewLeftInBar = (interviewOffset / span) * 100;
+          const showEndFallbackName = isWeekStartLabel && interviewOverlapsNameAtStart;
 
           return `
             <div class="week-bar" style="--start:${visibleStart};--span:${span};--lane:${laneIndex};background:${event.fill};color:${event.ink}">
               ${showName ? `<span class="week-bar-text">${event.name}</span>` : ""}
+              ${showEndFallbackName ? `<span class="week-bar-end-name">${event.name}</span>` : ""}
               ${showInterview ? `<span class="week-interview-tag" style="left:${interviewLeftInBar}%;background:${event.fill};color:${event.ink};border-color:${event.ink}">面談開始</span>` : ""}
             </div>
           `;
@@ -295,7 +301,7 @@ function renderMonth(year, month) {
       <div class="week-header">
         <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div><div>日</div>
       </div>
-      <div class="month-weeks">${weekRows}</div>
+      <div class="month-weeks">${renderedWeekRows}</div>
     </section>
   `;
 }
