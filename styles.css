@@ -58,6 +58,23 @@ body {
   cursor: pointer;
 }
 
+.sort-trigger {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sort-mark {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  color: #5f735f;
+}
+
 .event-table tr[draggable="true"] {
   cursor: grab;
 }
@@ -116,6 +133,21 @@ body {
 
 .month-block {
   margin-bottom: 18px;
+}
+
+.calendar-filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+#calendarMemberSelect {
+  min-width: 190px;
+  border: 1px solid #c9d8c5;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
 }
 
 .month-title {

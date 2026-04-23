@@ -1,4 +1,5 @@
 const STORAGE_KEY = "schedule-events-v3";
+const LIST_SORT_KEY = "schedule-list-sort-v2";
 
 const seedEvents = [
   { id: makeId(), name: "デベロゴン", start: "2026-04-01", end: "2026-04-19", interview: "2026-04-11", fill: "#dff4dc", ink: "#255725" },
@@ -11,7 +12,12 @@ const seedEvents = [
   { id: makeId(), name: "りんださん", start: "2026-06-14", end: "2026-06-28", interview: "2026-06-21", fill: "#fdf0e4", ink: "#8a4f1f" }
 ];
 
-const state = { events: loadEvents(), editingId: null };
+const state = {
+  events: loadEvents(),
+  editingId: null,
+  selectedCalendarId: "all",
+  listSort: loadListSort()
+};
 let dragSourceId = null;
 
 const form = document.querySelector("#eventForm");
@@ -108,7 +114,7 @@ function renderAll() {
 
 function renderEventList() {
   const root = document.querySelector("#eventList");
-  const rows = [...state.events]
+  const rows = getListRows()
     .map((event) => {
       return `
       <tr data-id="${event.id}" draggable="true">
@@ -134,7 +140,20 @@ function renderEventList() {
     </div>
     <table class="event-table">
       <thead>
-        <tr><th class="check-cell">削除</th><th>名前</th><th>期間</th><th>面談開始</th></tr>
+        <tr>
+          <th class="check-cell">削除</th>
+          <th>名前</th>
+          <th>
+            <button type="button" class="sort-trigger" data-sort-key="start">
+              期間 <span class="sort-mark">${sortMark("start")}</span>
+            </button>
+          </th>
+          <th>
+            <button type="button" class="sort-trigger" data-sort-key="interview">
+              面談開始 <span class="sort-mark">${sortMark("interview")}</span>
+            </button>
+          </th>
+        </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -144,6 +163,7 @@ function renderEventList() {
   const checkAll = root.querySelector("#checkAllRows");
   const rowChecks = root.querySelectorAll(".row-check");
   const deleteSelectedButton = root.querySelector("#deleteSelectedButton");
+  const sortTriggers = root.querySelectorAll(".sort-trigger");
 
   checkAll.addEventListener("change", () => {
     rowChecks.forEach((checkbox) => {
@@ -163,6 +183,12 @@ function renderEventList() {
 
   deleteSelectedButton.addEventListener("click", () => {
     deleteSelected([...root.querySelectorAll(".row-check:checked")].map((item) => item.dataset.id));
+  });
+
+  sortTriggers.forEach((button) => {
+    button.addEventListener("click", () => {
+      toggleListSort(button.dataset.sortKey);
+    });
   });
 
   root.querySelectorAll("tbody tr").forEach((row) => {
@@ -202,7 +228,7 @@ function onRowDragEnd(e) {
 }
 
 function reorderEvent(sourceId, targetId) {
-  const currentOrder = state.events.map((event) => event.id);
+  const currentOrder = getListRows().map((event) => event.id);
   const sourceIndex = currentOrder.findIndex((id) => id === sourceId);
   const targetIndex = currentOrder.findIndex((id) => id === targetId);
   if (sourceIndex < 0 || targetIndex < 0) return;
@@ -210,8 +236,38 @@ function reorderEvent(sourceId, targetId) {
   currentOrder.splice(targetIndex, 0, movedId);
   const eventById = new Map(state.events.map((event) => [event.id, event]));
   state.events = currentOrder.map((id) => eventById.get(id)).filter(Boolean);
+  state.listSort = { key: "none", dir: "asc" };
+  saveListSort();
   saveEvents();
   renderAll();
+}
+
+function getListRows() {
+  if (state.listSort.key === "none") return [...state.events];
+  const key = state.listSort.key;
+  const dir = state.listSort.dir === "desc" ? -1 : 1;
+  return [...state.events].sort((a, b) => {
+    const primary = a[key].localeCompare(b[key]) * dir;
+    if (primary !== 0) return primary;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function toggleListSort(key) {
+  if (state.listSort.key !== key) {
+    state.listSort = { key, dir: "asc" };
+  } else if (state.listSort.dir === "asc") {
+    state.listSort = { key, dir: "desc" };
+  } else {
+    state.listSort = { key: "none", dir: "asc" };
+  }
+  saveListSort();
+  renderEventList();
+}
+
+function sortMark(key) {
+  if (state.listSort.key !== key) return "▽";
+  return state.listSort.dir === "asc" ? "▲" : "▼";
 }
 
 function deleteSelected(selectedIds) {
@@ -230,11 +286,48 @@ function deleteSelected(selectedIds) {
 
 function renderCalendar() {
   const root = document.querySelector("#calendarRoot");
-  const months = collectMonths(state.events);
-  root.innerHTML = months.map(({ year, month }) => renderMonth(year, month)).join("");
+  renderCalendarControls();
+  const visibleEvents = getVisibleCalendarEvents();
+  const months = collectMonths(visibleEvents);
+  root.innerHTML = months.map(({ year, month }) => renderMonth(year, month, visibleEvents)).join("");
 }
 
-function renderMonth(year, month) {
+function renderCalendarControls() {
+  const controlRoot = document.querySelector("#calendarControls");
+  const hasSelected = state.selectedCalendarId === "all" || state.events.some((event) => event.id === state.selectedCalendarId);
+  if (!hasSelected) state.selectedCalendarId = "all";
+
+  const options = [
+    `<option value="all" ${state.selectedCalendarId === "all" ? "selected" : ""}>全員</option>`,
+    ...state.events.map(
+      (event) => `<option value="${event.id}" ${state.selectedCalendarId === event.id ? "selected" : ""}>${event.name}</option>`
+    )
+  ]
+    .join("");
+
+  controlRoot.innerHTML = `
+    <div class="calendar-filter-row">
+      <label for="calendarMemberSelect">表示対象</label>
+      <select id="calendarMemberSelect">
+        ${options}
+      </select>
+    </div>
+  `;
+
+  const memberSelect = controlRoot.querySelector("#calendarMemberSelect");
+
+  memberSelect.addEventListener("change", () => {
+    state.selectedCalendarId = memberSelect.value;
+    renderCalendar();
+  });
+}
+
+function getVisibleCalendarEvents() {
+  if (state.selectedCalendarId === "all") return state.events;
+  return state.events.filter((event) => event.id === state.selectedCalendarId);
+}
+
+function renderMonth(year, month, events) {
   const first = new Date(year, month - 1, 1);
   const last = new Date(year, month, 0);
   const firstOffset = (first.getDay() + 6) % 7;
@@ -266,10 +359,10 @@ function renderMonth(year, month) {
       const weekEnd = weekDays[6].date;
       const minInMonthIdx = weekDays.findIndex((day) => day.inMonth);
       const maxInMonthIdx = 6 - [...weekDays].reverse().findIndex((day) => day.inMonth);
-      const orderedEvents = [...state.events].sort(
+      const orderedEvents = [...events].sort(
         (a, b) => a.start.localeCompare(b.start) || a.name.localeCompare(b.name)
       );
-      const segments = state.events
+      const segments = events
         .filter((event) => !(event.end < weekStart || event.start > weekEnd))
         .map((event) => {
           const startIdx = Math.max(0, diffDays(new Date(weekStart), new Date(event.start)));
@@ -414,6 +507,20 @@ function loadEvents() {
   }
 }
 
+function loadListSort() {
+  try {
+    const raw = localStorage.getItem(LIST_SORT_KEY);
+    if (!raw) return { key: "none", dir: "asc" };
+    const parsed = JSON.parse(raw);
+    const validKey = parsed?.key === "start" || parsed?.key === "interview" ? parsed.key : "none";
+    const validDir = parsed?.dir === "desc" ? "desc" : "asc";
+    return { key: validKey, dir: validDir };
+  } catch {
+    return { key: "none", dir: "asc" };
+  }
+}
+
+
 
 function saveEvents() {
   try {
@@ -422,6 +529,15 @@ function saveEvents() {
     alert("ブラウザ保存に失敗しました。");
   }
 }
+
+function saveListSort() {
+  try {
+    localStorage.setItem(LIST_SORT_KEY, JSON.stringify(state.listSort));
+  } catch {
+    // ignore
+  }
+}
+
 
 
 function makeId() {
