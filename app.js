@@ -246,10 +246,12 @@ function renderMonth(year, month) {
           const span = Math.max(1, visibleEnd - visibleStart + 1);
           const showInterview = event.interview >= weekStart && event.interview <= weekEnd;
           const startsThisWeek = event.start >= weekStart && event.start <= weekEnd;
-          const showName = startsThisWeek || !showInterview;
           const interviewPos = showInterview
             ? Math.max(0, diffDays(new Date(weekStart), new Date(event.interview)))
             : 0;
+          const isWeekStartLabel = visibleStart === 0 || startsThisWeek;
+          const interviewOverlapsNameAtStart = showInterview && interviewPos === visibleStart;
+          const showName = isWeekStartLabel && !interviewOverlapsNameAtStart;
           const interviewOffset = interviewPos - visibleStart + 0.5;
           const interviewLeftInBar = (interviewOffset / span) * 100;
 
