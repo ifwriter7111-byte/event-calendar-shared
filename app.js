@@ -286,6 +286,7 @@ function deleteSelected(selectedIds) {
 
 function renderCalendar() {
   const root = document.querySelector("#calendarRoot");
+  if (!root) return;
   renderCalendarControls();
   const visibleEvents = getVisibleCalendarEvents();
   const months = collectMonths(visibleEvents);
@@ -294,6 +295,7 @@ function renderCalendar() {
 
 function renderCalendarControls() {
   const controlRoot = document.querySelector("#calendarControls");
+  if (!controlRoot) return;
   const hasSelected = state.selectedCalendarId === "all" || state.events.some((event) => event.id === state.selectedCalendarId);
   if (!hasSelected) state.selectedCalendarId = "all";
 
