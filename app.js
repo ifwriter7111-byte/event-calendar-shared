@@ -282,7 +282,7 @@ function renderMonth(year, month) {
         .join("");
 
       const todayIdx = weekDays.findIndex((day) => day.date === todayIso);
-      const barsHeight = Math.max(26, placed.length * 18 + 8);
+      const barsHeight = Math.max(22, placed.length * 16 + 4);
       return `
         <div class="week-block">
           <div class="day-grid">${dayCells}</div>

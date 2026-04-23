@@ -182,7 +182,7 @@ body {
   position: absolute;
   left: calc((100% / 7) * var(--start));
   width: calc((100% / 7) * var(--span));
-  top: calc(var(--lane) * 18px + 4px);
+  top: calc(var(--lane) * 16px + 2px);
   height: 14px;
   border-radius: 3px;
   font-size: 10px;
