@@ -235,18 +235,33 @@ function reorderEvent(sourceId, targetId) {
   const [movedId] = currentOrder.splice(sourceIndex, 1);
   currentOrder.splice(targetIndex, 0, movedId);
   const eventById = new Map(state.events.map((event) => [event.id, event]));
-  state.events = currentOrder.map((id) => eventById.get(id)).filter(Boolean);
+  const visibleSet = new Set(currentOrder);
+  const hiddenEvents = state.events.filter((event) => !visibleSet.has(event.id));
+  state.events = [...currentOrder.map((id) => eventById.get(id)).filter(Boolean), ...hiddenEvents];
   state.listSort = { key: "none", dir: "asc" };
   saveListSort();
   saveEvents();
   renderAll();
 }
 
+function getTodayIso() {
+  const now = new Date();
+  return toISO(now.getFullYear(), now.getMonth() + 1, now.getDate());
+}
+
+// 終了日が今日以降のイベント（＝まだ終わっていないもの）だけを返す。
+// 終了日当日は残し、翌日から一覧・カレンダーに出さない。データ自体は消さない。
+function getActiveEvents() {
+  const today = getTodayIso();
+  return state.events.filter((event) => event.end >= today);
+}
+
 function getListRows() {
-  if (state.listSort.key === "none") return [...state.events];
+  const source = getActiveEvents();
+  if (state.listSort.key === "none") return source;
   const key = state.listSort.key;
   const dir = state.listSort.dir === "desc" ? -1 : 1;
-  return [...state.events].sort((a, b) => {
+  return source.sort((a, b) => {
     const primary = a[key].localeCompare(b[key]) * dir;
     if (primary !== 0) return primary;
     return a.name.localeCompare(b.name);
@@ -296,12 +311,13 @@ function renderCalendar() {
 function renderCalendarControls() {
   const controlRoot = document.querySelector("#calendarControls");
   if (!controlRoot) return;
-  const hasSelected = state.selectedCalendarId === "all" || state.events.some((event) => event.id === state.selectedCalendarId);
+  const activeEvents = getActiveEvents();
+  const hasSelected = state.selectedCalendarId === "all" || activeEvents.some((event) => event.id === state.selectedCalendarId);
   if (!hasSelected) state.selectedCalendarId = "all";
 
   const options = [
     `<option value="all" ${state.selectedCalendarId === "all" ? "selected" : ""}>全員</option>`,
-    ...state.events.map(
+    ...activeEvents.map(
       (event) => `<option value="${event.id}" ${state.selectedCalendarId === event.id ? "selected" : ""}>${event.name}</option>`
     )
   ]
@@ -325,8 +341,9 @@ function renderCalendarControls() {
 }
 
 function getVisibleCalendarEvents() {
-  if (state.selectedCalendarId === "all") return state.events;
-  return state.events.filter((event) => event.id === state.selectedCalendarId);
+  const active = getActiveEvents();
+  if (state.selectedCalendarId === "all") return active;
+  return active.filter((event) => event.id === state.selectedCalendarId);
 }
 
 function renderMonth(year, month, events) {
@@ -449,28 +466,30 @@ function renderMonth(year, month, events) {
 }
 
 function collectMonths(events) {
-  if (events.length === 0) {
-    const now = new Date();
-    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return [
-      { year: now.getFullYear(), month: now.getMonth() + 1 },
-      { year: next.getFullYear(), month: next.getMonth() + 1 }
-    ];
+  // 今月から、最低でも今年の12月までは必ず表示する。
+  const now = new Date();
+  const startYear = now.getFullYear();
+  const startMonth = now.getMonth() + 1;
+
+  let endYear = startYear;
+  let endMonth = 12;
+
+  // 予定が今年12月より先まで続く場合は、その月まで伸ばす（予定を途中で切らない）。
+  if (events.length > 0) {
+    const maxEnd = [...events].sort((a, b) => b.end.localeCompare(a.end))[0].end;
+    const endDate = new Date(maxEnd);
+    const eventEndYear = endDate.getFullYear();
+    const eventEndMonth = endDate.getMonth() + 1;
+    if (eventEndYear > endYear || (eventEndYear === endYear && eventEndMonth > endMonth)) {
+      endYear = eventEndYear;
+      endMonth = eventEndMonth;
+    }
   }
 
-  const minStart = [...events].sort((a, b) => a.start.localeCompare(b.start))[0].start;
-  const maxEnd = [...events].sort((a, b) => b.end.localeCompare(a.end))[0].end;
-  const start = new Date(minStart);
-  const end = new Date(maxEnd);
-  const endWithNextMonth = new Date(end.getFullYear(), end.getMonth() + 1, 1);
   const result = [];
-
-  let year = start.getFullYear();
-  let month = start.getMonth() + 1;
-  while (
-    year < endWithNextMonth.getFullYear() ||
-    (year === endWithNextMonth.getFullYear() && month <= endWithNextMonth.getMonth() + 1)
-  ) {
+  let year = startYear;
+  let month = startMonth;
+  while (year < endYear || (year === endYear && month <= endMonth)) {
     result.push({ year, month });
     month += 1;
     if (month > 12) {
@@ -577,4 +596,3 @@ function diffDays(fromDate, toDate) {
   const toUtc = Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
   return Math.floor((toUtc - fromUtc) / 86400000);
 }
-
