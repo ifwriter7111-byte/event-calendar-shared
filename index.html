@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ローンチスケジュール</title>
-  <link rel="stylesheet" href="./styles.css?v=20260423-7" />
+  <link rel="stylesheet" href="./styles.css?v=20260708-2" />
 </head>
 <body>
   <main class="container">
@@ -29,13 +29,14 @@
         <form id="eventForm">
           <input type="hidden" id="eventId" />
 
-          <label>名前
-            <input id="name" required />
+          <label>ローンチ名
+            <input id="name" list="nameOptions" autocomplete="off" required />
           </label>
-          <label>開始日
+          <datalist id="nameOptions"></datalist>
+          <label>開始日 <span class="field-note">※最初の配信開始日</span>
             <input id="start" type="date" required />
           </label>
-          <label>終了日
+          <label>終了日 <span class="field-note">※後追いまでの完全終了日</span>
             <input id="end" type="date" required />
           </label>
           <label>面談開始日
@@ -43,9 +44,6 @@
           </label>
           <label>帯の背景色
             <input id="fill" type="color" value="#dff4dc" />
-          </label>
-          <label>文字色
-            <input id="ink" type="color" value="#255725" />
           </label>
 
           <div class="buttons">
@@ -58,6 +56,6 @@
     </section>
   </main>
 
-  <script type="module" src="./app.js?v=20260423-7"></script>
+  <script type="module" src="./app.js?v=20260708-2"></script>
 </body>
 </html>
