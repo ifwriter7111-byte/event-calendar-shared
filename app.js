@@ -1,5 +1,6 @@
 const STORAGE_KEY = "schedule-events-v3";
 const LIST_SORT_KEY = "schedule-list-sort-v2";
+const NAME_HISTORY_KEY = "schedule-name-history-v1";
 
 const seedEvents = [
   { id: makeId(), name: "デベロゴン", start: "2026-04-01", end: "2026-04-19", interview: "2026-04-11", fill: "#dff4dc", ink: "#255725" },
@@ -45,6 +46,7 @@ function onSubmit(e) {
     state.events.push({ id: makeId(), ...payload });
   }
 
+  rememberName(payload.name);
   saveEvents();
   renderAll();
   clearForm();
@@ -108,6 +110,7 @@ function startEdit(id) {
 }
 
 function renderAll() {
+  renderNameOptions();
   renderEventList();
   renderCalendar();
 }
@@ -562,6 +565,54 @@ function saveListSort() {
 }
 
 
+
+function loadNameHistory() {
+  try {
+    const raw = localStorage.getItem(NAME_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+  } catch {
+    return [];
+  }
+}
+
+function saveNameHistory(names) {
+  try {
+    localStorage.setItem(NAME_HISTORY_KEY, JSON.stringify(names));
+  } catch {
+    // ignore
+  }
+}
+
+// 一度でも入力した名前を履歴に残す（イベントを消しても候補には残る）。
+function rememberName(name) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return;
+  const history = loadNameHistory();
+  if (!history.includes(trimmed)) {
+    history.push(trimmed);
+    saveNameHistory(history);
+  }
+}
+
+// 履歴＋現在のイベント名を合わせた、重複なしの候補一覧。
+function getNameSuggestions() {
+  const set = new Set(loadNameHistory());
+  state.events.forEach((event) => {
+    if (event.name) set.add(event.name);
+  });
+  return [...set].sort((a, b) => a.localeCompare(b, "ja"));
+}
+
+function renderNameOptions() {
+  const datalist = document.querySelector("#nameOptions");
+  if (!datalist) return;
+  datalist.innerHTML = getNameSuggestions()
+    .map((name) => `<option value="${name.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}"></option>`)
+    .join("");
+}
 
 function makeId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
