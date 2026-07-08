@@ -277,6 +277,20 @@ body {
   margin-bottom: 8px;
 }
 
+.field-note {
+  color: #6b7d6b;
+  font-size: 11px;
+  font-weight: normal;
+}
+
+/* 文字色は黒で統一（帯・バッジ・カレンダー文字） */
+.name-badge,
+.week-bar,
+.week-interview-tag,
+.week-end-name-tag {
+  color: #000 !important;
+}
+
 .form-pane input {
   width: 100%;
   margin-top: 4px;
