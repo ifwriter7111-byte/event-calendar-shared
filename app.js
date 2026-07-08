@@ -2,6 +2,10 @@ const STORAGE_KEY = "schedule-events-v3";
 const LIST_SORT_KEY = "schedule-list-sort-v2";
 const NAME_HISTORY_KEY = "schedule-name-history-v1";
 
+// 共有バックエンド（Googleスプレッドシート）のURL。
+// 空 "" にすると、この端末だけに保存する従来モードになる。
+const API_URL = "https://script.google.com/macros/s/AKfycbxNLee4rbCM7qU5Ex3AmTixeksqlJ0kBxS0R2wk-HhxflRC-spTia7knEcFYuvzIhj96g/exec";
+
 const seedEvents = [
   { id: makeId(), name: "デベロゴン", start: "2026-04-01", end: "2026-04-19", interview: "2026-04-11", fill: "#dff4dc", ink: "#255725" },
   { id: makeId(), name: "ブイプロ", start: "2026-04-18", end: "2026-04-27", interview: "2026-04-24", fill: "#e0edf8", ink: "#1f4b77" },
@@ -14,12 +18,13 @@ const seedEvents = [
 ];
 
 const state = {
-  events: loadEvents(),
+  events: API_URL ? [] : loadEvents(),
   editingId: null,
   selectedCalendarId: "all",
   listSort: loadListSort()
 };
 let dragSourceId = null;
+let lastServerJson = "";
 
 const form = document.querySelector("#eventForm");
 const formTitle = document.querySelector("#formTitle");
@@ -32,32 +37,46 @@ form.addEventListener("submit", onSubmit);
 resetButton.addEventListener("click", clearForm);
 deleteButton.addEventListener("click", onDelete);
 
-renderAll();
+init();
 
-function onSubmit(e) {
+async function onSubmit(e) {
   e.preventDefault();
 
   const payload = collectFormValues();
   if (!payload) return;
 
-  if (state.editingId) {
-    state.events = state.events.map((event) => (event.id === state.editingId ? { ...event, ...payload } : event));
-  } else {
-    state.events.push({ id: makeId(), ...payload });
-  }
-
   rememberName(payload.name);
-  saveEvents();
-  renderAll();
+  const editingId = state.editingId;
   clearForm();
+
+  if (editingId) {
+    await persist(
+      { action: "update", event: { ...payload, id: editingId } },
+      () => {
+        state.events = state.events.map((event) => (event.id === editingId ? { ...event, ...payload } : event));
+      }
+    );
+  } else {
+    const id = makeId();
+    await persist(
+      { action: "add", event: { ...payload, id } },
+      () => {
+        state.events.push({ id, ...payload });
+      }
+    );
+  }
 }
 
-function onDelete() {
+async function onDelete() {
   if (!state.editingId) return;
-  state.events = state.events.filter((event) => event.id !== state.editingId);
-  saveEvents();
-  renderAll();
+  const id = state.editingId;
   clearForm();
+  await persist(
+    { action: "delete", ids: [id] },
+    () => {
+      state.events = state.events.filter((event) => event.id !== id);
+    }
+  );
 }
 
 function collectFormValues() {
@@ -66,7 +85,7 @@ function collectFormValues() {
   const end = document.querySelector("#end").value;
   const interview = document.querySelector("#interview").value;
   const fill = document.querySelector("#fill").value;
-  const ink = document.querySelector("#ink").value;
+  const ink = "#000000";
 
   if (!name || !start || !end || !interview) return null;
   if (start > end) {
@@ -83,7 +102,6 @@ function collectFormValues() {
 function clearForm() {
   form.reset();
   document.querySelector("#fill").value = "#dff4dc";
-  document.querySelector("#ink").value = "#255725";
   state.editingId = null;
   eventIdInput.value = "";
   formTitle.textContent = "イベント追加";
@@ -106,13 +124,77 @@ function startEdit(id) {
   document.querySelector("#end").value = event.end;
   document.querySelector("#interview").value = event.interview;
   document.querySelector("#fill").value = event.fill;
-  document.querySelector("#ink").value = event.ink;
 }
 
 function renderAll() {
   renderNameOptions();
   renderEventList();
   renderCalendar();
+}
+
+// ===== 共有バックエンド（Googleスプレッドシート）連携 =====
+
+async function apiList() {
+  const res = await fetch(API_URL);
+  return res.json();
+}
+
+async function apiSend(body) {
+  const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(body) });
+  return res.json();
+}
+
+function setEventsFromServer(list) {
+  state.events = Array.isArray(list) ? list.map(normalizeEvent).filter(Boolean) : [];
+  saveEvents();
+}
+
+// 変更を保存する。共有モードならサーバーへ送って全員に反映、そうでなければこの端末に保存。
+async function persist(apiBody, localApply) {
+  if (API_URL) {
+    try {
+      const list = await apiSend(apiBody);
+      setEventsFromServer(list);
+      lastServerJson = JSON.stringify(list);
+    } catch (e) {
+      alert("共有サーバーとの通信に失敗しました。通信環境を確認して、もう一度お試しください。");
+    }
+  } else {
+    localApply();
+    saveEvents();
+  }
+  renderAll();
+}
+
+async function init() {
+  if (API_URL) {
+    try {
+      const list = await apiList();
+      setEventsFromServer(list);
+      lastServerJson = JSON.stringify(list);
+    } catch (e) {
+      state.events = loadEvents();
+    }
+    renderAll();
+    setInterval(refreshFromServer, 15000);
+    window.addEventListener("focus", refreshFromServer);
+  } else {
+    renderAll();
+  }
+}
+
+// 他の人の変更を定期的に取り込む（編集中・チェック中は邪魔しない）。
+async function refreshFromServer() {
+  if (!API_URL || state.editingId) return;
+  if (document.querySelector(".row-check:checked")) return;
+  try {
+    const list = await apiList();
+    const json = JSON.stringify(list);
+    if (json === lastServerJson) return;
+    lastServerJson = json;
+    setEventsFromServer(list);
+    renderAll();
+  } catch (e) {}
 }
 
 function renderEventList() {
@@ -145,7 +227,7 @@ function renderEventList() {
       <thead>
         <tr>
           <th class="check-cell">削除</th>
-          <th>名前</th>
+          <th>ローンチ名</th>
           <th>
             <button type="button" class="sort-trigger" data-sort-key="start">
               期間 <span class="sort-mark">${sortMark("start")}</span>
@@ -230,21 +312,25 @@ function onRowDragEnd(e) {
   dragSourceId = null;
 }
 
-function reorderEvent(sourceId, targetId) {
+async function reorderEvent(sourceId, targetId) {
   const currentOrder = getListRows().map((event) => event.id);
   const sourceIndex = currentOrder.findIndex((id) => id === sourceId);
   const targetIndex = currentOrder.findIndex((id) => id === targetId);
   if (sourceIndex < 0 || targetIndex < 0) return;
   const [movedId] = currentOrder.splice(sourceIndex, 1);
   currentOrder.splice(targetIndex, 0, movedId);
-  const eventById = new Map(state.events.map((event) => [event.id, event]));
   const visibleSet = new Set(currentOrder);
-  const hiddenEvents = state.events.filter((event) => !visibleSet.has(event.id));
-  state.events = [...currentOrder.map((id) => eventById.get(id)).filter(Boolean), ...hiddenEvents];
+  const hiddenIds = state.events.filter((event) => !visibleSet.has(event.id)).map((event) => event.id);
+  const fullOrder = [...currentOrder, ...hiddenIds];
   state.listSort = { key: "none", dir: "asc" };
   saveListSort();
-  saveEvents();
-  renderAll();
+  await persist(
+    { action: "reorder", order: fullOrder },
+    () => {
+      const eventById = new Map(state.events.map((event) => [event.id, event]));
+      state.events = fullOrder.map((id) => eventById.get(id)).filter(Boolean);
+    }
+  );
 }
 
 function getTodayIso() {
@@ -288,7 +374,7 @@ function sortMark(key) {
   return state.listSort.dir === "asc" ? "▲" : "▼";
 }
 
-function deleteSelected(selectedIds) {
+async function deleteSelected(selectedIds) {
   if (selectedIds.length === 0) {
     alert("削除するイベントを選択してください。");
     return;
@@ -296,10 +382,13 @@ function deleteSelected(selectedIds) {
   const ok = confirm(`${selectedIds.length}件のイベントを削除します。よろしいですか？`);
   if (!ok) return;
 
-  state.events = state.events.filter((event) => !selectedIds.includes(event.id));
   if (state.editingId && selectedIds.includes(state.editingId)) clearForm();
-  saveEvents();
-  renderAll();
+  await persist(
+    { action: "delete", ids: selectedIds },
+    () => {
+      state.events = state.events.filter((event) => !selectedIds.includes(event.id));
+    }
+  );
 }
 
 function renderCalendar() {
