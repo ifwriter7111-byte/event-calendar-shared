@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ローンチスケジュール</title>
-  <link rel="stylesheet" href="./styles.css?v=20260708-6" />
+  <link rel="stylesheet" href="./styles.css?v=20260709-1" />
 </head>
 <body>
   <main class="container">
@@ -47,20 +47,21 @@
         <label>面談開始日
           <input id="interview" type="date" required />
         </label>
-        <label>対象リスト</label>
+        <label>対象リスト <span class="field-note">※複数の場合は、リストを追加してください。</span></label>
         <div id="targetListContainer"></div>
-        <button type="button" id="addTargetRow" class="secondary btn-small">＋ 対象を追加</button>
+        <button type="button" id="addTargetRow" class="secondary btn-small">＋ リスト追加</button>
         <label>帯の背景色
           <input id="fill" type="color" value="#dff4dc" />
         </label>
         <div class="buttons">
           <button type="submit" id="submitButton">追加する</button>
           <button type="button" id="addCancel" class="secondary">閉じる</button>
+          <button type="button" id="addReset" class="secondary">リセット</button>
         </div>
       </form>
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=20260708-6"></script>
+  <script type="module" src="./app.js?v=20260709-1"></script>
 </body>
 </html>
