@@ -28,20 +28,13 @@ let lastServerJson = "";
 let inlineEditingActive = false;
 
 const form = document.querySelector("#eventForm");
-const formTitle = document.querySelector("#formTitle");
-const eventIdInput = document.querySelector("#eventId");
-const submitButton = document.querySelector("#submitButton");
-const deleteButton = document.querySelector("#deleteButton");
-const resetButton = document.querySelector("#resetButton");
 
 form.addEventListener("submit", onSubmit);
-resetButton.addEventListener("click", clearForm);
-deleteButton.addEventListener("click", onDelete);
-document.querySelector("#editForm").addEventListener("submit", onEditSubmit);
-document.querySelector("#editDelete").addEventListener("click", onEditDelete);
-document.querySelector("#editCancel").addEventListener("click", closeEditModal);
-document.querySelector("#editModal").addEventListener("click", (e) => {
-  if (e.target.id === "editModal") closeEditModal();
+document.querySelector("#openAddButton").addEventListener("click", openAddModal);
+document.querySelector("#addCancel").addEventListener("click", closeAddModal);
+document.querySelector("#addTargetRow").addEventListener("click", () => addTargetRow(""));
+document.querySelector("#addModal").addEventListener("click", (e) => {
+  if (e.target.id === "addModal") closeAddModal();
 });
 
 init();
@@ -53,35 +46,13 @@ async function onSubmit(e) {
   if (!payload) return;
 
   rememberName(payload.name);
-  const editingId = state.editingId;
-  clearForm();
-
-  if (editingId) {
-    await persist(
-      { action: "update", event: { ...payload, id: editingId } },
-      () => {
-        state.events = state.events.map((event) => (event.id === editingId ? { ...event, ...payload } : event));
-      }
-    );
-  } else {
-    const id = makeId();
-    await persist(
-      { action: "add", event: { ...payload, id } },
-      () => {
-        state.events.push({ id, ...payload });
-      }
-    );
-  }
-}
-
-async function onDelete() {
-  if (!state.editingId) return;
-  const id = state.editingId;
+  const id = makeId();
+  closeAddModal();
   clearForm();
   await persist(
-    { action: "delete", ids: [id] },
+    { action: "add", event: { ...payload, id } },
     () => {
-      state.events = state.events.filter((event) => event.id !== id);
+      state.events.push({ id, ...payload });
     }
   );
 }
@@ -93,6 +64,7 @@ function collectFormValues() {
   const interview = document.querySelector("#interview").value;
   const fill = document.querySelector("#fill").value;
   const ink = "#000000";
+  const targetList = collectTargetList();
 
   if (!name || !start || !end || !interview) return null;
   if (start > end) {
@@ -103,83 +75,76 @@ function collectFormValues() {
     alert("面談開始日は開始日〜終了日の範囲にしてください。");
     return null;
   }
-  return { name, start, end, interview, fill, ink };
+  return { name, start, end, interview, fill, ink, targetList };
 }
 
 function clearForm() {
   form.reset();
   document.querySelector("#fill").value = "#dff4dc";
-  state.editingId = null;
-  eventIdInput.value = "";
-  formTitle.textContent = "イベント追加";
-  submitButton.textContent = "追加する";
-  deleteButton.classList.add("hidden");
+  resetTargetRows();
 }
 
-// 一覧の行タップで編集ポップアップを開く。
-function openEditModal(id) {
-  const event = state.events.find((item) => item.id === id);
-  if (!event) return;
-  document.querySelector("#editId").value = id;
-  document.querySelector("#editName").value = event.name;
-  document.querySelector("#editStart").value = event.start;
-  document.querySelector("#editEnd").value = event.end;
-  document.querySelector("#editInterview").value = event.interview;
-  document.querySelector("#editFill").value = event.fill;
-  document.querySelector("#editModal").classList.remove("hidden");
+// 「イベント追加」ボタンで開く追加モーダル。
+function openAddModal() {
+  clearForm();
+  document.querySelector("#addModal").classList.remove("hidden");
+  document.querySelector("#name").focus();
 }
 
-function closeEditModal() {
-  document.querySelector("#editModal").classList.add("hidden");
+function closeAddModal() {
+  document.querySelector("#addModal").classList.add("hidden");
 }
 
-async function onEditSubmit(e) {
-  e.preventDefault();
-  const name = document.querySelector("#editName").value.trim();
-  const start = document.querySelector("#editStart").value;
-  const end = document.querySelector("#editEnd").value;
-  const interview = document.querySelector("#editInterview").value;
-  const fill = document.querySelector("#editFill").value;
+// ===== 対象リスト（複数入力） =====
 
-  if (!name || !start || !end || !interview) return;
-  if (start > end) {
-    alert("終了日は開始日以降にしてください。");
-    return;
-  }
-  if (interview < start || interview > end) {
-    alert("面談開始日は開始日〜終了日の範囲にしてください。");
-    return;
-  }
-
-  const id = document.querySelector("#editId").value;
-  const payload = { name, start, end, interview, fill, ink: "#000000" };
-  rememberName(name);
-  closeEditModal();
-  await persist(
-    { action: "update", event: { ...payload, id } },
-    () => {
-      state.events = state.events.map((event) => (event.id === id ? { ...event, ...payload } : event));
-    }
-  );
+function addTargetRow(value) {
+  const container = document.querySelector("#targetListContainer");
+  const row = document.createElement("div");
+  row.className = "target-row";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "target-input";
+  input.placeholder = "対象を入力";
+  input.value = value || "";
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "target-remove";
+  remove.textContent = "×";
+  remove.addEventListener("click", () => {
+    row.remove();
+    if (!container.querySelector(".target-row")) addTargetRow("");
+  });
+  row.appendChild(input);
+  row.appendChild(remove);
+  container.appendChild(row);
 }
 
-async function onEditDelete() {
-  const id = document.querySelector("#editId").value;
-  const ok = confirm("このローンチを削除します。よろしいですか？");
-  if (!ok) return;
-  closeEditModal();
-  await persist(
-    { action: "delete", ids: [id] },
-    () => {
-      state.events = state.events.filter((event) => event.id !== id);
-    }
-  );
+function resetTargetRows(values) {
+  const container = document.querySelector("#targetListContainer");
+  if (!container) return;
+  container.innerHTML = "";
+  const list = Array.isArray(values) && values.length ? values : [""];
+  list.forEach((v) => addTargetRow(v));
+}
+
+function collectTargetList() {
+  return [...document.querySelectorAll("#targetListContainer .target-input")]
+    .map((i) => i.value.trim())
+    .filter((v) => v);
 }
 
 function renderAll() {
   renderNameOptions();
   renderEventList();
   renderCalendar();
+}
+
+// 対象リストを小さなチップで表示する。
+function renderTargetChips(list) {
+  if (!Array.isArray(list) || list.length === 0) return "";
+  return list
+    .map((t) => `<span class="target-chip">${String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`)
+    .join("");
 }
 
 // ===== 共有バックエンド（Googleスプレッドシート）連携 =====
@@ -239,7 +204,6 @@ async function init() {
 // 他の人の変更を定期的に取り込む（編集中・チェック中は邪魔しない）。
 async function refreshFromServer() {
   if (!API_URL || state.editingId || inlineEditingActive) return;
-  if (document.querySelector(".row-check:checked")) return;
   try {
     const list = await apiList();
     const json = JSON.stringify(list);
@@ -256,7 +220,7 @@ function renderEventList() {
     .map((event) => {
       return `
       <tr data-id="${event.id}" draggable="true">
-        <td class="check-cell"><input type="checkbox" class="row-check" data-id="${event.id}" /></td>
+        <td class="check-cell"><button type="button" class="danger row-delete" data-id="${event.id}">削除</button></td>
         <td><span class="name-badge editable-name" data-id="${event.id}" title="クリックで名前を変更" style="background:${event.fill};color:${event.ink}">${event.name}</span></td>
         <td class="period-cell">
           <span class="editable-date period-date" data-id="${event.id}" data-field="start" data-value="${event.start}" title="クリックで変更">${formatDateWithWeekday(event.start)}</span>
@@ -264,18 +228,12 @@ function renderEventList() {
           <span class="editable-date period-date" data-id="${event.id}" data-field="end" data-value="${event.end}" title="クリックで変更">${formatDateWithWeekday(event.end)}</span>
         </td>
         <td><span class="editable-date" data-id="${event.id}" data-field="interview" data-value="${event.interview}" title="クリックで変更">${formatDateWithWeekday(event.interview)}</span></td>
+        <td class="target-cell">${renderTargetChips(event.targetList)}</td>
       </tr>`;
     })
     .join("");
 
   root.innerHTML = `
-    <div class="list-actions">
-      <label class="check-label">
-        <input type="checkbox" id="checkAllRows" />
-        全選択
-      </label>
-      <button type="button" id="deleteSelectedButton" class="danger">選択したイベントを削除</button>
-    </div>
     <table class="event-table">
       <thead>
         <tr>
@@ -291,36 +249,21 @@ function renderEventList() {
               面談開始 <span class="sort-mark">${sortMark("interview")}</span>
             </button>
           </th>
+          <th>対象リスト</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p>※ 名前や日付を直接クリックすると、その場で変更できます。削除したい行はチェックを入れて削除ボタンを押してください。</p>
+    <p>※ 名前や日付を直接クリックすると、その場で変更できます。行を削除するには右の「削除」ボタンを押してください。</p>
   `;
 
-  const checkAll = root.querySelector("#checkAllRows");
-  const rowChecks = root.querySelectorAll(".row-check");
-  const deleteSelectedButton = root.querySelector("#deleteSelectedButton");
   const sortTriggers = root.querySelectorAll(".sort-trigger");
 
-  checkAll.addEventListener("change", () => {
-    rowChecks.forEach((checkbox) => {
-      checkbox.checked = checkAll.checked;
-    });
-  });
-
-  rowChecks.forEach((checkbox) => {
-    checkbox.addEventListener("click", (e) => {
+  root.querySelectorAll(".row-delete").forEach((button) => {
+    button.addEventListener("click", (e) => {
       e.stopPropagation();
+      deleteSingle(button.dataset.id);
     });
-    checkbox.addEventListener("change", () => {
-      const allChecked = [...rowChecks].every((item) => item.checked);
-      checkAll.checked = allChecked;
-    });
-  });
-
-  deleteSelectedButton.addEventListener("click", () => {
-    deleteSelected([...root.querySelectorAll(".row-check:checked")].map((item) => item.dataset.id));
   });
 
   sortTriggers.forEach((button) => {
@@ -428,7 +371,7 @@ async function updateEventField(id, field, value) {
     return false;
   }
   await persist(
-    { action: "update", event: { id, name: updated.name, start: updated.start, end: updated.end, interview: updated.interview, fill: updated.fill } },
+    { action: "update", event: { id, name: updated.name, start: updated.start, end: updated.end, interview: updated.interview, fill: updated.fill, targetList: updated.targetList || [] } },
     () => {
       state.events = state.events.map((e) => (e.id === id ? updated : e));
     }
@@ -525,19 +468,15 @@ function sortMark(key) {
   return state.listSort.dir === "asc" ? "▲" : "▼";
 }
 
-async function deleteSelected(selectedIds) {
-  if (selectedIds.length === 0) {
-    alert("削除するイベントを選択してください。");
-    return;
-  }
-  const ok = confirm(`${selectedIds.length}件のイベントを削除します。よろしいですか？`);
+async function deleteSingle(id) {
+  const event = state.events.find((e) => e.id === id);
+  const label = event ? `「${event.name}」を` : "この予定を";
+  const ok = confirm(`${label}削除しますか？`);
   if (!ok) return;
-
-  if (state.editingId && selectedIds.includes(state.editingId)) clearForm();
   await persist(
-    { action: "delete", ids: selectedIds },
+    { action: "delete", ids: [id] },
     () => {
-      state.events = state.events.filter((event) => !selectedIds.includes(event.id));
+      state.events = state.events.filter((e) => e.id !== id);
     }
   );
 }
@@ -870,12 +809,15 @@ function normalizeEvent(input) {
   const interview = typeof input.interview === "string" ? input.interview : "";
   const fill = typeof input.fill === "string" && input.fill ? input.fill : "#dff4dc";
   const ink = typeof input.ink === "string" && input.ink ? input.ink : "#255725";
+  const targetList = Array.isArray(input.targetList)
+    ? input.targetList.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim())
+    : [];
 
   if (!name || !isIsoDate(start) || !isIsoDate(end) || !isIsoDate(interview)) return null;
   if (start > end) return null;
   if (interview < start || interview > end) return null;
 
-  return { id, name, start, end, interview, fill, ink };
+  return { id, name, start, end, interview, fill, ink, targetList };
 }
 
 function isIsoDate(value) {
