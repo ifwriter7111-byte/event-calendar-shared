@@ -36,6 +36,12 @@ const resetButton = document.querySelector("#resetButton");
 form.addEventListener("submit", onSubmit);
 resetButton.addEventListener("click", clearForm);
 deleteButton.addEventListener("click", onDelete);
+document.querySelector("#editForm").addEventListener("submit", onEditSubmit);
+document.querySelector("#editDelete").addEventListener("click", onEditDelete);
+document.querySelector("#editCancel").addEventListener("click", closeEditModal);
+document.querySelector("#editModal").addEventListener("click", (e) => {
+  if (e.target.id === "editModal") closeEditModal();
+});
 
 init();
 
@@ -109,21 +115,64 @@ function clearForm() {
   deleteButton.classList.add("hidden");
 }
 
-function startEdit(id) {
+// 一覧の行タップで編集ポップアップを開く。
+function openEditModal(id) {
   const event = state.events.find((item) => item.id === id);
   if (!event) return;
+  document.querySelector("#editId").value = id;
+  document.querySelector("#editName").value = event.name;
+  document.querySelector("#editStart").value = event.start;
+  document.querySelector("#editEnd").value = event.end;
+  document.querySelector("#editInterview").value = event.interview;
+  document.querySelector("#editFill").value = event.fill;
+  document.querySelector("#editModal").classList.remove("hidden");
+}
 
-  state.editingId = id;
-  eventIdInput.value = id;
-  formTitle.textContent = "イベント編集";
-  submitButton.textContent = "更新する";
-  deleteButton.classList.remove("hidden");
+function closeEditModal() {
+  document.querySelector("#editModal").classList.add("hidden");
+}
 
-  document.querySelector("#name").value = event.name;
-  document.querySelector("#start").value = event.start;
-  document.querySelector("#end").value = event.end;
-  document.querySelector("#interview").value = event.interview;
-  document.querySelector("#fill").value = event.fill;
+async function onEditSubmit(e) {
+  e.preventDefault();
+  const name = document.querySelector("#editName").value.trim();
+  const start = document.querySelector("#editStart").value;
+  const end = document.querySelector("#editEnd").value;
+  const interview = document.querySelector("#editInterview").value;
+  const fill = document.querySelector("#editFill").value;
+
+  if (!name || !start || !end || !interview) return;
+  if (start > end) {
+    alert("終了日は開始日以降にしてください。");
+    return;
+  }
+  if (interview < start || interview > end) {
+    alert("面談開始日は開始日〜終了日の範囲にしてください。");
+    return;
+  }
+
+  const id = document.querySelector("#editId").value;
+  const payload = { name, start, end, interview, fill, ink: "#000000" };
+  rememberName(name);
+  closeEditModal();
+  await persist(
+    { action: "update", event: { ...payload, id } },
+    () => {
+      state.events = state.events.map((event) => (event.id === id ? { ...event, ...payload } : event));
+    }
+  );
+}
+
+async function onEditDelete() {
+  const id = document.querySelector("#editId").value;
+  const ok = confirm("このローンチを削除します。よろしいですか？");
+  if (!ok) return;
+  closeEditModal();
+  await persist(
+    { action: "delete", ids: [id] },
+    () => {
+      state.events = state.events.filter((event) => event.id !== id);
+    }
+  );
 }
 
 function renderAll() {
@@ -141,9 +190,7 @@ async function apiList() {
 
 async function apiSend(body) {
   // 書き込みは no-cors で送る（Googleにログインしていない別の人の端末でも確実に届く）。
-  // 返事は読まず、直後に GET で最新一覧を取り直す（GET は誰でも読める）。
   await fetch(API_URL, { method: "POST", body: JSON.stringify(body), mode: "no-cors" });
-  return apiList();
 }
 
 function setEventsFromServer(list) {
@@ -153,19 +200,22 @@ function setEventsFromServer(list) {
 
 // 変更を保存する。共有モードならサーバーへ送って全員に反映、そうでなければこの端末に保存。
 async function persist(apiBody, localApply) {
-  if (API_URL) {
-    try {
-      const list = await apiSend(apiBody);
-      setEventsFromServer(list);
-      lastServerJson = JSON.stringify(list);
-    } catch (e) {
-      alert("共有サーバーとの通信に失敗しました。通信環境を確認して、もう一度お試しください。");
-    }
-  } else {
-    localApply();
-    saveEvents();
-  }
+  // まず手元に即反映（楽観的更新）＝操作した人にはすぐ見える。
+  localApply();
   renderAll();
+  if (!API_URL) {
+    saveEvents();
+    return;
+  }
+  try {
+    await apiSend(apiBody);
+  } catch (e) {
+    alert("共有サーバーとの通信に失敗しました。通信環境を確認して、もう一度お試しください。");
+    return;
+  }
+  saveEvents();
+  // 少し後にサーバーの確定内容を取り込み、他の人の変更とも整合を取る。
+  setTimeout(refreshFromServer, 1500);
 }
 
 async function init() {
@@ -188,6 +238,7 @@ async function init() {
 // 他の人の変更を定期的に取り込む（編集中・チェック中は邪魔しない）。
 async function refreshFromServer() {
   if (!API_URL || state.editingId) return;
+  if (!document.querySelector("#editModal").classList.contains("hidden")) return;
   if (document.querySelector(".row-check:checked")) return;
   try {
     const list = await apiList();
@@ -283,7 +334,7 @@ function renderEventList() {
     row.addEventListener("dragover", onRowDragOver);
     row.addEventListener("drop", onRowDrop);
     row.addEventListener("dragend", onRowDragEnd);
-    row.addEventListener("click", () => startEdit(row.dataset.id));
+    row.addEventListener("click", () => openEditModal(row.dataset.id));
   });
 }
 
