@@ -326,6 +326,51 @@ button.danger {
   display: none;
 }
 
+/* 一覧の行タップで開く編集ポップアップ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal-box h3 {
+  margin: 0 0 12px;
+}
+
+.modal-box label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.modal-box input {
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px;
+  border: 1px solid #c9d8c5;
+  border-radius: 6px;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
