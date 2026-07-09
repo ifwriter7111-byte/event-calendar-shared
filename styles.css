@@ -90,6 +90,31 @@ body {
   font-weight: 600;
 }
 
+/* クリックでその場編集できる要素 */
+.editable-name {
+  cursor: pointer;
+}
+
+.editable-date {
+  cursor: pointer;
+  border-bottom: 1px dashed #9db69a;
+}
+
+.editable-name:hover,
+.editable-date:hover {
+  outline: 2px solid #bfe0bb;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.inline-edit-input {
+  font: inherit;
+  padding: 2px 5px;
+  border: 1px solid #2f7d2f;
+  border-radius: 5px;
+  max-width: 160px;
+}
+
 .period-cell {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
