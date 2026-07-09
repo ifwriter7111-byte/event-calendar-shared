@@ -24,8 +24,60 @@ body {
 
 .layout {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.list-header h2 {
+  margin: 0;
+}
+
+/* 対象リスト（複数入力）の行 */
+.target-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.target-row .target-input {
+  flex: 1;
+  margin-top: 0;
+}
+
+.target-remove {
+  flex: 0 0 auto;
+  background: #bc3e3e;
+  padding: 4px 10px;
+}
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+/* 一覧に表示する対象リストのチップ */
+.target-chip {
+  display: inline-block;
+  background: #eef4ed;
+  border: 1px solid #d4dfd2;
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin: 1px 2px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.target-cell {
+  max-width: 220px;
 }
 
 .left-pane {
@@ -132,8 +184,13 @@ body {
 }
 
 .check-cell {
-  width: 72px;
+  width: 64px;
   text-align: center;
+}
+
+.row-delete {
+  padding: 3px 10px;
+  font-size: 12px;
 }
 
 .list-actions {
