@@ -25,6 +25,7 @@ const state = {
 };
 let dragSourceId = null;
 let lastServerJson = "";
+let inlineEditingActive = false;
 
 const form = document.querySelector("#eventForm");
 const formTitle = document.querySelector("#formTitle");
@@ -237,8 +238,7 @@ async function init() {
 
 // 他の人の変更を定期的に取り込む（編集中・チェック中は邪魔しない）。
 async function refreshFromServer() {
-  if (!API_URL || state.editingId) return;
-  if (!document.querySelector("#editModal").classList.contains("hidden")) return;
+  if (!API_URL || state.editingId || inlineEditingActive) return;
   if (document.querySelector(".row-check:checked")) return;
   try {
     const list = await apiList();
@@ -257,13 +257,13 @@ function renderEventList() {
       return `
       <tr data-id="${event.id}" draggable="true">
         <td class="check-cell"><input type="checkbox" class="row-check" data-id="${event.id}" /></td>
-        <td><span class="name-badge" style="background:${event.fill};color:${event.ink}">${event.name}</span></td>
+        <td><span class="name-badge editable-name" data-id="${event.id}" title="クリックで名前を変更" style="background:${event.fill};color:${event.ink}">${event.name}</span></td>
         <td class="period-cell">
-          <span class="period-date">${formatDateWithWeekday(event.start)}</span>
+          <span class="editable-date period-date" data-id="${event.id}" data-field="start" data-value="${event.start}" title="クリックで変更">${formatDateWithWeekday(event.start)}</span>
           <span class="period-sep">〜</span>
-          <span class="period-date">${formatDateWithWeekday(event.end)}</span>
+          <span class="editable-date period-date" data-id="${event.id}" data-field="end" data-value="${event.end}" title="クリックで変更">${formatDateWithWeekday(event.end)}</span>
         </td>
-        <td>${formatDateWithWeekday(event.interview)}</td>
+        <td><span class="editable-date" data-id="${event.id}" data-field="interview" data-value="${event.interview}" title="クリックで変更">${formatDateWithWeekday(event.interview)}</span></td>
       </tr>`;
     })
     .join("");
@@ -295,7 +295,7 @@ function renderEventList() {
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p>※ 行をクリックすると編集できます。削除したい行はチェックを入れて削除ボタンを押してください。</p>
+    <p>※ 名前や日付を直接クリックすると、その場で変更できます。削除したい行はチェックを入れて削除ボタンを押してください。</p>
   `;
 
   const checkAll = root.querySelector("#checkAllRows");
@@ -334,8 +334,106 @@ function renderEventList() {
     row.addEventListener("dragover", onRowDragOver);
     row.addEventListener("drop", onRowDrop);
     row.addEventListener("dragend", onRowDragEnd);
-    row.addEventListener("click", () => openEditModal(row.dataset.id));
   });
+
+  root.querySelectorAll(".editable-date").forEach((span) => {
+    span.addEventListener("click", () => startInlineDateEdit(span));
+  });
+  root.querySelectorAll(".editable-name").forEach((span) => {
+    span.addEventListener("click", () => startInlineNameEdit(span));
+  });
+}
+
+// 一覧の日付をその場で編集（クリック→日付選択→保存）。
+function startInlineDateEdit(span) {
+  const id = span.dataset.id;
+  const field = span.dataset.field;
+  const current = span.dataset.value;
+  const input = document.createElement("input");
+  input.type = "date";
+  input.value = current;
+  input.className = "inline-edit-input";
+  inlineEditingActive = true;
+  span.replaceWith(input);
+  input.focus();
+  if (input.showPicker) {
+    try { input.showPicker(); } catch (e) {}
+  }
+  let done = false;
+  const commit = async () => {
+    if (done) return;
+    done = true;
+    inlineEditingActive = false;
+    const newVal = input.value;
+    if (!newVal || newVal === current) {
+      renderEventList();
+      return;
+    }
+    const ok = await updateEventField(id, field, newVal);
+    if (!ok) renderEventList();
+  };
+  input.addEventListener("change", commit);
+  input.addEventListener("blur", commit);
+  input.addEventListener("mousedown", (e) => e.stopPropagation());
+}
+
+// 一覧の名前をその場で編集（クリック→文字入力→保存）。
+function startInlineNameEdit(span) {
+  const id = span.dataset.id;
+  const current = span.textContent;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = current;
+  input.className = "inline-edit-input";
+  input.setAttribute("list", "nameOptions");
+  input.setAttribute("autocomplete", "off");
+  inlineEditingActive = true;
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const commit = async () => {
+    if (done) return;
+    done = true;
+    inlineEditingActive = false;
+    const newVal = input.value.trim();
+    if (!newVal || newVal === current) {
+      renderEventList();
+      return;
+    }
+    rememberName(newVal);
+    await updateEventField(id, "name", newVal);
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+    }
+  });
+  input.addEventListener("mousedown", (e) => e.stopPropagation());
+}
+
+// 1項目だけ更新して保存する。妥当性チェック付き。
+async function updateEventField(id, field, value) {
+  const target = state.events.find((e) => e.id === id);
+  if (!target) return false;
+  const updated = { ...target, [field]: value };
+  if (updated.start > updated.end) {
+    alert("終了日は開始日以降にしてください。");
+    return false;
+  }
+  if (updated.interview < updated.start || updated.interview > updated.end) {
+    alert("面談開始日は開始日〜終了日の範囲にしてください。");
+    return false;
+  }
+  await persist(
+    { action: "update", event: { id, name: updated.name, start: updated.start, end: updated.end, interview: updated.interview, fill: updated.fill } },
+    () => {
+      state.events = state.events.map((e) => (e.id === id ? updated : e));
+    }
+  );
+  return true;
 }
 
 function onRowDragStart(e) {
