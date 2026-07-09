@@ -32,6 +32,7 @@ const form = document.querySelector("#eventForm");
 form.addEventListener("submit", onSubmit);
 document.querySelector("#openAddButton").addEventListener("click", openAddModal);
 document.querySelector("#addCancel").addEventListener("click", closeAddModal);
+document.querySelector("#addReset").addEventListener("click", clearForm);
 document.querySelector("#addTargetRow").addEventListener("click", () => addTargetRow(""));
 document.querySelector("#addModal").addEventListener("click", (e) => {
   if (e.target.id === "addModal") closeAddModal();
@@ -127,10 +128,17 @@ function resetTargetRows(values) {
   list.forEach((v) => addTargetRow(v));
 }
 
+// 「、」「,」やスペース（全角・半角）で区切られた入力を、別々のリスト名に分ける。
+function splitTargetInput(value) {
+  return String(value || "")
+    .split(/[、,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function collectTargetList() {
   return [...document.querySelectorAll("#targetListContainer .target-input")]
-    .map((i) => i.value.trim())
-    .filter((v) => v);
+    .flatMap((i) => splitTargetInput(i.value));
 }
 
 function renderAll() {
@@ -290,7 +298,7 @@ function renderEventList() {
   });
 }
 
-// 一覧の対象リストをその場で編集（クリック→「、」区切りで入力→保存）。
+// 一覧の対象リストをその場で編集（クリック→「、」やスペース区切りで入力→保存）。
 function startInlineTargetEdit(span) {
   const id = span.dataset.id;
   const event = state.events.find((e) => e.id === id);
@@ -299,7 +307,6 @@ function startInlineTargetEdit(span) {
   input.type = "text";
   input.className = "inline-edit-input inline-target-input";
   input.value = current;
-  input.placeholder = "例: Aさん、Bチーム（、で区切る）";
   inlineEditingActive = true;
   span.replaceWith(input);
   input.focus();
@@ -309,7 +316,7 @@ function startInlineTargetEdit(span) {
     if (done) return;
     done = true;
     inlineEditingActive = false;
-    const newList = input.value.split(/[、,]/).map((s) => s.trim()).filter(Boolean);
+    const newList = splitTargetInput(input.value);
     const before = event && Array.isArray(event.targetList) ? event.targetList : [];
     if (JSON.stringify(before) === JSON.stringify(newList)) {
       renderEventList();
@@ -640,7 +647,7 @@ function renderMonth(year, month, events) {
           const showEndFallbackName = isWeekStartLabel && interviewOverlapsNameAtStart;
           const endCellIndex = Math.min(visibleEnd, endIdx);
           const endCellLeft = (endCellIndex / 7) * 100;
-          const endNameTop = laneIndex * 22 + 2;
+          const endNameTop = laneIndex * 32 + 4;
 
           return `
             <div class="week-bar" style="--start:${visibleStart};--span:${span};--lane:${laneIndex};background:${event.fill};color:${event.ink}">
@@ -663,7 +670,8 @@ function renderMonth(year, month, events) {
         .join("");
 
       const todayIdx = weekDays.findIndex((day) => day.date === todayIso);
-      const barsHeight = Math.max(26, placed.length * 22 + 4);
+      // 帯エリアは最低でも約2倍の高さ（52px）。イベントが重なるぶんは1レーン32pxずつ伸ばす。
+      const barsHeight = Math.max(52, placed.length * 32 + 8);
       return `
         <div class="week-block">
           <div class="day-grid">${dayCells}</div>
@@ -869,3 +877,4 @@ function diffDays(fromDate, toDate) {
   const toUtc = Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
   return Math.floor((toUtc - fromUtc) / 86400000);
 }
+
