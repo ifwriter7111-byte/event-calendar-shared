@@ -228,7 +228,7 @@ function renderEventList() {
           <span class="editable-date period-date" data-id="${event.id}" data-field="end" data-value="${event.end}" title="クリックで変更">${formatDateWithWeekday(event.end)}</span>
         </td>
         <td><span class="editable-date" data-id="${event.id}" data-field="interview" data-value="${event.interview}" title="クリックで変更">${formatDateWithWeekday(event.interview)}</span></td>
-        <td class="target-cell">${renderTargetChips(event.targetList)}</td>
+        <td class="target-cell"><span class="editable-target" data-id="${event.id}" title="クリックで対象リストを編集">${(event.targetList && event.targetList.length) ? renderTargetChips(event.targetList) : '<span class="target-placeholder">＋ 追加</span>'}</span></td>
       </tr>`;
     })
     .join("");
@@ -285,6 +285,46 @@ function renderEventList() {
   root.querySelectorAll(".editable-name").forEach((span) => {
     span.addEventListener("click", () => startInlineNameEdit(span));
   });
+  root.querySelectorAll(".editable-target").forEach((span) => {
+    span.addEventListener("click", () => startInlineTargetEdit(span));
+  });
+}
+
+// 一覧の対象リストをその場で編集（クリック→「、」区切りで入力→保存）。
+function startInlineTargetEdit(span) {
+  const id = span.dataset.id;
+  const event = state.events.find((e) => e.id === id);
+  const current = event && Array.isArray(event.targetList) ? event.targetList.join("、") : "";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "inline-edit-input inline-target-input";
+  input.value = current;
+  input.placeholder = "例: Aさん、Bチーム（、で区切る）";
+  inlineEditingActive = true;
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const commit = async () => {
+    if (done) return;
+    done = true;
+    inlineEditingActive = false;
+    const newList = input.value.split(/[、,]/).map((s) => s.trim()).filter(Boolean);
+    const before = event && Array.isArray(event.targetList) ? event.targetList : [];
+    if (JSON.stringify(before) === JSON.stringify(newList)) {
+      renderEventList();
+      return;
+    }
+    await updateEventField(id, "targetList", newList);
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+    }
+  });
+  input.addEventListener("mousedown", (e) => e.stopPropagation());
 }
 
 // 一覧の日付をその場で編集（クリック→日付選択→保存）。
@@ -600,7 +640,7 @@ function renderMonth(year, month, events) {
           const showEndFallbackName = isWeekStartLabel && interviewOverlapsNameAtStart;
           const endCellIndex = Math.min(visibleEnd, endIdx);
           const endCellLeft = (endCellIndex / 7) * 100;
-          const endNameTop = laneIndex * 16 + 2;
+          const endNameTop = laneIndex * 22 + 2;
 
           return `
             <div class="week-bar" style="--start:${visibleStart};--span:${span};--lane:${laneIndex};background:${event.fill};color:${event.ink}">
@@ -623,7 +663,7 @@ function renderMonth(year, month, events) {
         .join("");
 
       const todayIdx = weekDays.findIndex((day) => day.date === todayIso);
-      const barsHeight = Math.max(22, placed.length * 16 + 4);
+      const barsHeight = Math.max(26, placed.length * 22 + 4);
       return `
         <div class="week-block">
           <div class="day-grid">${dayCells}</div>
