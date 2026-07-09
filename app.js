@@ -140,8 +140,10 @@ async function apiList() {
 }
 
 async function apiSend(body) {
-  const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(body) });
-  return res.json();
+  // 書き込みは no-cors で送る（Googleにログインしていない別の人の端末でも確実に届く）。
+  // 返事は読まず、直後に GET で最新一覧を取り直す（GET は誰でも読める）。
+  await fetch(API_URL, { method: "POST", body: JSON.stringify(body), mode: "no-cors" });
+  return apiList();
 }
 
 function setEventsFromServer(list) {
