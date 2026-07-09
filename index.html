@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ローンチスケジュール</title>
-  <link rel="stylesheet" href="./styles.css?v=20260708-5" />
+  <link rel="stylesheet" href="./styles.css?v=20260708-6" />
 </head>
 <body>
   <main class="container">
@@ -12,10 +12,13 @@
       <h1>ローンチスケジュール</h1>
     </header>
 
-    <section class="layout">
+    <section class="layout single">
       <div class="left-pane">
         <section class="card">
-          <h2>イベント一覧</h2>
+          <div class="list-header">
+            <h2>イベント一覧</h2>
+            <button type="button" id="openAddButton">＋ イベント追加</button>
+          </div>
           <div id="eventList"></div>
         </section>
         <section class="card">
@@ -23,68 +26,41 @@
           <div id="calendarRoot"></div>
         </section>
       </div>
-
-      <aside class="card form-pane">
-        <h2 id="formTitle">イベント追加</h2>
-        <form id="eventForm">
-          <input type="hidden" id="eventId" />
-
-          <label>ローンチ名
-            <input id="name" list="nameOptions" autocomplete="off" required />
-          </label>
-          <datalist id="nameOptions"></datalist>
-          <label>開始日 <span class="field-note">※最初の配信開始日</span>
-            <input id="start" type="date" required />
-          </label>
-          <label>終了日 <span class="field-note">※後追いまでの完全終了日</span>
-            <input id="end" type="date" required />
-          </label>
-          <label>面談開始日
-            <input id="interview" type="date" required />
-          </label>
-          <label>帯の背景色
-            <input id="fill" type="color" value="#dff4dc" />
-          </label>
-
-          <div class="buttons">
-            <button type="submit" id="submitButton">追加する</button>
-            <button type="button" id="resetButton" class="secondary">入力をクリア</button>
-            <button type="button" id="deleteButton" class="danger hidden">削除する</button>
-          </div>
-        </form>
-      </aside>
     </section>
   </main>
 
-  <div id="editModal" class="modal-overlay hidden">
+  <datalist id="nameOptions"></datalist>
+
+  <div id="addModal" class="modal-overlay hidden">
     <div class="modal-box">
-      <h3>ローンチを編集</h3>
-      <form id="editForm">
-        <input type="hidden" id="editId" />
+      <h3>イベント追加</h3>
+      <form id="eventForm">
         <label>ローンチ名
-          <input id="editName" list="nameOptions" autocomplete="off" required />
+          <input id="name" list="nameOptions" autocomplete="off" required />
         </label>
         <label>開始日 <span class="field-note">※最初の配信開始日</span>
-          <input id="editStart" type="date" required />
+          <input id="start" type="date" required />
         </label>
         <label>終了日 <span class="field-note">※後追いまでの完全終了日</span>
-          <input id="editEnd" type="date" required />
+          <input id="end" type="date" required />
         </label>
         <label>面談開始日
-          <input id="editInterview" type="date" required />
+          <input id="interview" type="date" required />
         </label>
+        <label>対象リスト</label>
+        <div id="targetListContainer"></div>
+        <button type="button" id="addTargetRow" class="secondary btn-small">＋ 対象を追加</button>
         <label>帯の背景色
-          <input id="editFill" type="color" value="#dff4dc" />
+          <input id="fill" type="color" value="#dff4dc" />
         </label>
         <div class="buttons">
-          <button type="submit" id="editSubmit">更新する</button>
-          <button type="button" id="editDelete" class="danger">削除する</button>
-          <button type="button" id="editCancel" class="secondary">閉じる</button>
+          <button type="submit" id="submitButton">追加する</button>
+          <button type="button" id="addCancel" class="secondary">閉じる</button>
         </div>
       </form>
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=20260708-5"></script>
+  <script type="module" src="./app.js?v=20260708-6"></script>
 </body>
 </html>
