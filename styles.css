@@ -77,7 +77,28 @@ body {
 }
 
 .target-cell {
-  max-width: 220px;
+  max-width: 240px;
+}
+
+.editable-target {
+  cursor: pointer;
+  display: inline-block;
+  min-width: 44px;
+}
+
+.editable-target:hover {
+  outline: 2px solid #bfe0bb;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.target-placeholder {
+  color: #6b7d6b;
+  font-size: 12px;
+}
+
+.inline-target-input {
+  max-width: 240px;
 }
 
 .left-pane {
