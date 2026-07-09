@@ -262,7 +262,6 @@ function renderEventList() {
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p>※ 名前や日付を直接クリックすると、その場で変更できます。行を削除するには右の「削除」ボタンを押してください。</p>
   `;
 
   const sortTriggers = root.querySelectorAll(".sort-trigger");
