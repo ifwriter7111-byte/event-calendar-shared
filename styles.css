@@ -31,8 +31,8 @@ body {
 .list-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 14px;
   margin-bottom: 8px;
 }
 
@@ -323,15 +323,17 @@ body {
   display: none;
 }
 
+/* 帯（バー）まわりの高さ。レーン間隔32px・バー高24pxで統一。
+   ここを変えたら app.js の endNameTop / barsHeight の計算値も合わせること。 */
 .week-bar {
   position: absolute;
   left: calc((100% / 7) * var(--start));
   width: calc((100% / 7) * var(--span));
-  top: calc(var(--lane) * 22px + 2px);
-  height: 19px;
+  top: calc(var(--lane) * 32px + 4px);
+  height: 24px;
   border-radius: 4px;
   font-size: 11px;
-  line-height: 19px;
+  line-height: 24px;
   padding: 0 5px;
   white-space: nowrap;
   overflow: visible;
@@ -348,7 +350,7 @@ body {
   transform: translateX(2px);
   display: inline-block;
   max-width: calc((100% / 7) - 4px);
-  line-height: 19px;
+  line-height: 24px;
   font-size: 11px;
   font-weight: 400;
   border-radius: 2px;
