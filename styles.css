@@ -306,12 +306,12 @@ body {
   position: absolute;
   left: calc((100% / 7) * var(--start));
   width: calc((100% / 7) * var(--span));
-  top: calc(var(--lane) * 16px + 2px);
-  height: 14px;
-  border-radius: 3px;
-  font-size: 10px;
-  line-height: 14px;
-  padding: 0 4px;
+  top: calc(var(--lane) * 22px + 2px);
+  height: 19px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 19px;
+  padding: 0 5px;
   white-space: nowrap;
   overflow: visible;
 }
@@ -327,8 +327,8 @@ body {
   transform: translateX(2px);
   display: inline-block;
   max-width: calc((100% / 7) - 4px);
-  line-height: 14px;
-  font-size: 10px;
+  line-height: 19px;
+  font-size: 11px;
   font-weight: 400;
   border-radius: 2px;
   padding: 0 2px;
