@@ -1,5 +1,5 @@
 const STORAGE_KEY = "schedule-events-v3";
-const LIST_SORT_KEY = "schedule-list-sort-v2";
+const LIST_SORT_KEY = "schedule-list-sort-v3";
 const NAME_HISTORY_KEY = "schedule-name-history-v1";
 
 // 共有バックエンド（Googleスプレッドシート）のURL。
@@ -23,7 +23,6 @@ const state = {
   selectedCalendarId: "all",
   listSort: loadListSort()
 };
-let dragSourceId = null;
 let lastServerJson = "";
 let inlineEditingActive = false;
 
@@ -227,7 +226,7 @@ function renderEventList() {
   const rows = getListRows()
     .map((event) => {
       return `
-      <tr data-id="${event.id}" draggable="true">
+      <tr data-id="${event.id}">
         <td class="check-cell"><button type="button" class="danger row-delete" data-id="${event.id}">削除</button></td>
         <td><span class="name-badge editable-name" data-id="${event.id}" title="クリックで名前を変更" style="background:${event.fill};color:${event.ink}">${event.name}</span></td>
         <td class="period-cell">
@@ -277,13 +276,6 @@ function renderEventList() {
     button.addEventListener("click", () => {
       toggleListSort(button.dataset.sortKey);
     });
-  });
-
-  root.querySelectorAll("tbody tr").forEach((row) => {
-    row.addEventListener("dragstart", onRowDragStart);
-    row.addEventListener("dragover", onRowDragOver);
-    row.addEventListener("drop", onRowDrop);
-    row.addEventListener("dragend", onRowDragEnd);
   });
 
   root.querySelectorAll(".editable-date").forEach((span) => {
@@ -425,54 +417,6 @@ async function updateEventField(id, field, value) {
   return true;
 }
 
-function onRowDragStart(e) {
-  const row = e.currentTarget;
-  dragSourceId = row.dataset.id;
-  row.classList.add("dragging");
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", dragSourceId);
-  }
-}
-
-function onRowDragOver(e) {
-  e.preventDefault();
-  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-}
-
-function onRowDrop(e) {
-  e.preventDefault();
-  const targetId = e.currentTarget.dataset.id;
-  if (!dragSourceId || !targetId || dragSourceId === targetId) return;
-  reorderEvent(dragSourceId, targetId);
-}
-
-function onRowDragEnd(e) {
-  e.currentTarget.classList.remove("dragging");
-  dragSourceId = null;
-}
-
-async function reorderEvent(sourceId, targetId) {
-  const currentOrder = getListRows().map((event) => event.id);
-  const sourceIndex = currentOrder.findIndex((id) => id === sourceId);
-  const targetIndex = currentOrder.findIndex((id) => id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0) return;
-  const [movedId] = currentOrder.splice(sourceIndex, 1);
-  currentOrder.splice(targetIndex, 0, movedId);
-  const visibleSet = new Set(currentOrder);
-  const hiddenIds = state.events.filter((event) => !visibleSet.has(event.id)).map((event) => event.id);
-  const fullOrder = [...currentOrder, ...hiddenIds];
-  state.listSort = { key: "none", dir: "asc" };
-  saveListSort();
-  await persist(
-    { action: "reorder", order: fullOrder },
-    () => {
-      const eventById = new Map(state.events.map((event) => [event.id, event]));
-      state.events = fullOrder.map((id) => eventById.get(id)).filter(Boolean);
-    }
-  );
-}
-
 function getTodayIso() {
   const now = new Date();
   return toISO(now.getFullYear(), now.getMonth() + 1, now.getDate());
@@ -487,23 +431,26 @@ function getActiveEvents() {
 
 function getListRows() {
   const source = getActiveEvents();
-  if (state.listSort.key === "none") return source;
-  const key = state.listSort.key;
+  // 一覧は常に面談開始日順（昇順）で自動整列。手動で「期間」列を選んだ場合だけ開始日順にする。
+  const key = state.listSort.key === "start" ? "start" : "interview";
+  const secondaryKey = key === "start" ? "interview" : "start";
   const dir = state.listSort.dir === "desc" ? -1 : 1;
   return source.sort((a, b) => {
     const primary = a[key].localeCompare(b[key]) * dir;
     if (primary !== 0) return primary;
+    // 主キーが同じときは、もう一方の日付→名前の順で安定させる。
+    const secondary = a[secondaryKey].localeCompare(b[secondaryKey]);
+    if (secondary !== 0) return secondary;
     return a.name.localeCompare(b.name);
   });
 }
 
 function toggleListSort(key) {
-  if (state.listSort.key !== key) {
-    state.listSort = { key, dir: "asc" };
-  } else if (state.listSort.dir === "asc") {
-    state.listSort = { key, dir: "desc" };
+  // 昇順⇄降順のみを切り替える（未ソート状態は持たず、常にどちらかで整列する）。
+  if (state.listSort.key === key) {
+    state.listSort = { key, dir: state.listSort.dir === "asc" ? "desc" : "asc" };
   } else {
-    state.listSort = { key: "none", dir: "asc" };
+    state.listSort = { key, dir: "asc" };
   }
   saveListSort();
   renderEventList();
@@ -760,15 +707,16 @@ function loadEvents() {
 }
 
 function loadListSort() {
+  // 既定は面談開始日の昇順。保存された設定が壊れていても面談開始日順に戻す。
   try {
     const raw = localStorage.getItem(LIST_SORT_KEY);
-    if (!raw) return { key: "none", dir: "asc" };
+    if (!raw) return { key: "interview", dir: "asc" };
     const parsed = JSON.parse(raw);
-    const validKey = parsed?.key === "start" || parsed?.key === "interview" ? parsed.key : "none";
+    const validKey = parsed?.key === "start" || parsed?.key === "interview" ? parsed.key : "interview";
     const validDir = parsed?.dir === "desc" ? "desc" : "asc";
     return { key: validKey, dir: validDir };
   } catch {
-    return { key: "none", dir: "asc" };
+    return { key: "interview", dir: "asc" };
   }
 }
 
@@ -876,4 +824,3 @@ function diffDays(fromDate, toDate) {
   const toUtc = Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
   return Math.floor((toUtc - fromUtc) / 86400000);
 }
-
