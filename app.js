@@ -723,26 +723,6 @@ function renderMonth(year, month, events) {
         })
         .join("");
 
-      // セミナー実施日の小さな印。帯の上に置き、ホバーで日時を表示（カレンダーが混まないよう時刻文字は出さない）。
-      const seminarMarks = placed
-        .map(({ event, laneIndex }) => {
-          if (!Array.isArray(event.seminars) || event.seminars.length === 0) return "";
-          return event.seminars
-            .map((s) => {
-              if (s.date < weekStart || s.date > weekEnd) return "";
-              if (s.date < event.start || s.date > event.end) return "";
-              const pos = diffDays(new Date(weekStart), new Date(s.date));
-              if (pos < 0 || pos > 6) return "";
-              if (!weekDays[pos] || !weekDays[pos].inMonth) return "";
-              const left = ((pos + 0.5) / 7) * 100;
-              const top = laneIndex * 32 + 16;
-              const title = `セミナー ${formatDate(s.date)}`;
-              return `<span class="week-seminar-dot" style="left:${left}%;top:${top}px" title="${title}">S</span>`;
-            })
-            .join("");
-        })
-        .join("");
-
       const dayCells = weekDays
         .map((day) => {
           return `
@@ -762,7 +742,6 @@ function renderMonth(year, month, events) {
           <div class="week-bars ${todayIdx >= 0 ? "has-today" : ""}" style="height:${barsHeight}px;--today-idx:${todayIdx}">
             ${todayIdx >= 0 ? '<div class="today-column"></div>' : ""}
             ${bars}
-            ${seminarMarks}
           </div>
         </div>
       `;
