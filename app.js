@@ -318,8 +318,8 @@ function renderEventList() {
           <span class="period-sep">〜</span>
           <span class="editable-date period-date" data-id="${event.id}" data-field="end" data-value="${event.end}" title="クリックで変更">${formatDateWithWeekday(event.end)}</span>
         </td>
-        <td><span class="editable-date" data-id="${event.id}" data-field="interview" data-value="${event.interview}" title="クリックで変更">${formatDateWithWeekday(event.interview)}</span></td>
         <td class="seminar-cell"><span class="editable-seminar" data-id="${event.id}" title="クリックでセミナー実施日時を編集">${renderSeminarChips(event.seminars)}</span></td>
+        <td><span class="editable-date" data-id="${event.id}" data-field="interview" data-value="${event.interview}" title="クリックで変更">${formatDateWithWeekday(event.interview)}</span></td>
         <td class="target-cell"><span class="editable-target" data-id="${event.id}" title="クリックで対象リストを編集">${(event.targetList && event.targetList.length) ? renderTargetChips(event.targetList) : '<span class="target-placeholder">＋ 追加</span>'}</span></td>
       </tr>`;
     })
@@ -337,11 +337,15 @@ function renderEventList() {
             </button>
           </th>
           <th>
+            <button type="button" class="sort-trigger" data-sort-key="seminars">
+              セミナー実施日時 <span class="sort-mark">${sortMark("seminars")}</span>
+            </button>
+          </th>
+          <th>
             <button type="button" class="sort-trigger" data-sort-key="interview">
               面談開始 <span class="sort-mark">${sortMark("interview")}</span>
             </button>
           </th>
-          <th>セミナー実施日時</th>
           <th>対象リスト</th>
         </tr>
       </thead>
@@ -549,18 +553,32 @@ function getActiveEvents() {
 
 function getListRows() {
   const source = getActiveEvents();
-  // 一覧は常に面談開始日順（昇順）で自動整列。手動で「期間」列を選んだ場合だけ開始日順にする。
-  const key = state.listSort.key === "start" ? "start" : "interview";
-  const secondaryKey = key === "start" ? "interview" : "start";
+  // 期間(start)・面談開始(interview)・セミナー実施日時(seminars)のいずれかで整列。
+  const key = ["start", "interview", "seminars"].includes(state.listSort.key) ? state.listSort.key : "interview";
   const dir = state.listSort.dir === "desc" ? -1 : 1;
+  // 並べ替え用の値。seminarsは最も早い実施日時、未設定は空文字。
+  const valueOf = (e) => (key === "seminars" ? seminarSortValue(e) : (e[key] || ""));
   return source.sort((a, b) => {
-    const primary = a[key].localeCompare(b[key]) * dir;
+    const av = valueOf(a);
+    const bv = valueOf(b);
+    // セミナー実施日時が未設定のイベントは、昇順・降順どちらでも末尾にまとめる。
+    if (key === "seminars" && av !== bv && (!av || !bv)) return av ? -1 : 1;
+    const primary = av.localeCompare(bv) * dir;
     if (primary !== 0) return primary;
-    // 主キーが同じときは、もう一方の日付→名前の順で安定させる。
-    const secondary = a[secondaryKey].localeCompare(b[secondaryKey]);
-    if (secondary !== 0) return secondary;
+    // 主キーが同じときは、面談開始→開始日→名前の順で安定させる。
+    const t1 = (a.interview || "").localeCompare(b.interview || "");
+    if (t1 !== 0) return t1;
+    const t2 = (a.start || "").localeCompare(b.start || "");
+    if (t2 !== 0) return t2;
     return a.name.localeCompare(b.name);
   });
+}
+
+// 並べ替え用に、そのイベントの最も早いセミナー実施日時を返す（未設定は ""）。
+function seminarSortValue(event) {
+  if (!Array.isArray(event.seminars) || event.seminars.length === 0) return "";
+  const s = event.seminars[0]; // normalizeSeminarsで昇順ソート済み＝先頭が最早
+  return `${s.date}T${s.time || "00:00"}`;
 }
 
 function toggleListSort(key) {
@@ -830,7 +848,7 @@ function loadListSort() {
     const raw = localStorage.getItem(LIST_SORT_KEY);
     if (!raw) return { key: "interview", dir: "asc" };
     const parsed = JSON.parse(raw);
-    const validKey = parsed?.key === "start" || parsed?.key === "interview" ? parsed.key : "interview";
+    const validKey = ["start", "interview", "seminars"].includes(parsed?.key) ? parsed.key : "interview";
     const validDir = parsed?.dir === "desc" ? "desc" : "asc";
     return { key: validKey, dir: validDir };
   } catch {
