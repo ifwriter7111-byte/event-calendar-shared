@@ -25,6 +25,7 @@ const state = {
 };
 let lastServerJson = "";
 let inlineEditingActive = false;
+let seminarEditingId = null;
 
 const form = document.querySelector("#eventForm");
 
@@ -35,6 +36,18 @@ document.querySelector("#addReset").addEventListener("click", clearForm);
 document.querySelector("#addTargetRow").addEventListener("click", () => addTargetRow(""));
 document.querySelector("#addModal").addEventListener("click", (e) => {
   if (e.target.id === "addModal") closeAddModal();
+});
+
+document.querySelector("#addSeminarRow").addEventListener("click", () =>
+  addSeminarRow(document.querySelector("#seminarListContainer"), "", "")
+);
+document.querySelector("#seminarEditAddRow").addEventListener("click", () =>
+  addSeminarRow(document.querySelector("#seminarEditContainer"), "", "")
+);
+document.querySelector("#seminarEditSave").addEventListener("click", saveSeminarModal);
+document.querySelector("#seminarEditCancel").addEventListener("click", closeSeminarModal);
+document.querySelector("#seminarModal").addEventListener("click", (e) => {
+  if (e.target.id === "seminarModal") closeSeminarModal();
 });
 
 init();
@@ -65,6 +78,7 @@ function collectFormValues() {
   const fill = document.querySelector("#fill").value;
   const ink = "#000000";
   const targetList = collectTargetList();
+  const seminars = collectSeminars(document.querySelector("#seminarListContainer"));
 
   if (!name || !start || !end || !interview) return null;
   if (start > end) {
@@ -75,13 +89,14 @@ function collectFormValues() {
     alert("面談開始日は開始日〜終了日の範囲にしてください。");
     return null;
   }
-  return { name, start, end, interview, fill, ink, targetList };
+  return { name, start, end, interview, fill, ink, targetList, seminars };
 }
 
 function clearForm() {
   form.reset();
   document.querySelector("#fill").value = "#dff4dc";
   resetTargetRows();
+  resetSeminarRows(document.querySelector("#seminarListContainer"), []);
 }
 
 // 「イベント追加」ボタンで開く追加モーダル。
@@ -140,6 +155,64 @@ function collectTargetList() {
     .flatMap((i) => splitTargetInput(i.value));
 }
 
+// ===== セミナー実施日時（日付＋時刻・複数入力） =====
+
+function addSeminarRow(container, date, time) {
+  if (!container) return;
+  const row = document.createElement("div");
+  row.className = "seminar-row";
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.className = "seminar-date";
+  dateInput.value = date || "";
+  const timeInput = document.createElement("input");
+  timeInput.type = "time";
+  timeInput.className = "seminar-time";
+  timeInput.value = time || "";
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "target-remove";
+  remove.textContent = "×";
+  remove.addEventListener("click", () => row.remove());
+  row.appendChild(dateInput);
+  row.appendChild(timeInput);
+  row.appendChild(remove);
+  container.appendChild(row);
+}
+
+// 実施日時は任意なので、既定は0行（「＋ 日時を追加」で増やす）。
+function resetSeminarRows(container, values) {
+  if (!container) return;
+  container.innerHTML = "";
+  const list = Array.isArray(values) ? values : [];
+  list.forEach((s) => addSeminarRow(container, s.date, s.time));
+}
+
+// 入力欄から実施日時を集める。日付が空の行は捨て、正規化・整列して返す。
+function collectSeminars(container) {
+  if (!container) return [];
+  const raw = [...container.querySelectorAll(".seminar-row")].map((row) => ({
+    date: row.querySelector(".seminar-date").value,
+    time: row.querySelector(".seminar-time").value
+  }));
+  return normalizeSeminars(raw);
+}
+
+// {date, time} の配列を検証（不正な日付は除外・時刻は HH:MM のみ許可）して日時順に並べる。
+function normalizeSeminars(input) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((s) => {
+      if (!s || typeof s !== "object") return null;
+      const date = typeof s.date === "string" ? s.date : "";
+      if (!isIsoDate(date)) return null;
+      const time = typeof s.time === "string" && /^\d{2}:\d{2}$/.test(s.time) ? s.time : "";
+      return { date, time };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.date + (a.time || "99:99")).localeCompare(b.date + (b.time || "99:99")));
+}
+
 function renderAll() {
   renderNameOptions();
   renderEventList();
@@ -151,6 +224,17 @@ function renderTargetChips(list) {
   if (!Array.isArray(list) || list.length === 0) return "";
   return list
     .map((t) => `<span class="target-chip">${String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`)
+    .join("");
+}
+
+// セミナー実施日時を小さなチップで表示する（例: 7/19(日) 14:00）。
+function renderSeminarChips(list) {
+  if (!Array.isArray(list) || list.length === 0) return '<span class="target-placeholder">＋ 追加</span>';
+  return list
+    .map((s) => {
+      const label = formatDateWithWeekday(s.date) + (s.time ? ` ${s.time}` : "");
+      return `<span class="seminar-chip">${label}</span>`;
+    })
     .join("");
 }
 
@@ -235,6 +319,7 @@ function renderEventList() {
           <span class="editable-date period-date" data-id="${event.id}" data-field="end" data-value="${event.end}" title="クリックで変更">${formatDateWithWeekday(event.end)}</span>
         </td>
         <td><span class="editable-date" data-id="${event.id}" data-field="interview" data-value="${event.interview}" title="クリックで変更">${formatDateWithWeekday(event.interview)}</span></td>
+        <td class="seminar-cell"><span class="editable-seminar" data-id="${event.id}" title="クリックでセミナー実施日時を編集">${renderSeminarChips(event.seminars)}</span></td>
         <td class="target-cell"><span class="editable-target" data-id="${event.id}" title="クリックで対象リストを編集">${(event.targetList && event.targetList.length) ? renderTargetChips(event.targetList) : '<span class="target-placeholder">＋ 追加</span>'}</span></td>
       </tr>`;
     })
@@ -256,6 +341,7 @@ function renderEventList() {
               面談開始 <span class="sort-mark">${sortMark("interview")}</span>
             </button>
           </th>
+          <th>セミナー実施日時</th>
           <th>対象リスト</th>
         </tr>
       </thead>
@@ -287,6 +373,38 @@ function renderEventList() {
   root.querySelectorAll(".editable-target").forEach((span) => {
     span.addEventListener("click", () => startInlineTargetEdit(span));
   });
+  root.querySelectorAll(".editable-seminar").forEach((span) => {
+    span.addEventListener("click", () => openSeminarModal(span.dataset.id));
+  });
+}
+
+// 一覧のセミナー実施日時セルをクリック → ポップアップで複数の日時を編集。
+function openSeminarModal(id) {
+  const event = state.events.find((e) => e.id === id);
+  if (!event) return;
+  seminarEditingId = id;
+  // 編集中はサーバーからの自動取り込みで内容が消えないよう一時停止する。
+  inlineEditingActive = true;
+  document.querySelector("#seminarEditName").textContent = event.name;
+  resetSeminarRows(document.querySelector("#seminarEditContainer"), event.seminars || []);
+  document.querySelector("#seminarModal").classList.remove("hidden");
+}
+
+function closeSeminarModal() {
+  document.querySelector("#seminarModal").classList.add("hidden");
+  seminarEditingId = null;
+  inlineEditingActive = false;
+}
+
+async function saveSeminarModal() {
+  const id = seminarEditingId;
+  if (!id) return;
+  const list = collectSeminars(document.querySelector("#seminarEditContainer"));
+  const event = state.events.find((e) => e.id === id);
+  const before = event && Array.isArray(event.seminars) ? event.seminars : [];
+  closeSeminarModal();
+  if (JSON.stringify(before) === JSON.stringify(list)) return;
+  await updateEventField(id, "seminars", list);
 }
 
 // 一覧の対象リストをその場で編集（クリック→「、」やスペース区切りで入力→保存）。
@@ -409,7 +527,7 @@ async function updateEventField(id, field, value) {
     return false;
   }
   await persist(
-    { action: "update", event: { id, name: updated.name, start: updated.start, end: updated.end, interview: updated.interview, fill: updated.fill, targetList: updated.targetList || [] } },
+    { action: "update", event: { id, name: updated.name, start: updated.start, end: updated.end, interview: updated.interview, fill: updated.fill, targetList: updated.targetList || [], seminars: updated.seminars || [] } },
     () => {
       state.events = state.events.map((e) => (e.id === id ? updated : e));
     }
@@ -605,6 +723,26 @@ function renderMonth(year, month, events) {
         })
         .join("");
 
+      // セミナー実施日の小さな印。帯の上に置き、ホバーで日時を表示（カレンダーが混まないよう時刻文字は出さない）。
+      const seminarMarks = placed
+        .map(({ event, laneIndex }) => {
+          if (!Array.isArray(event.seminars) || event.seminars.length === 0) return "";
+          return event.seminars
+            .map((s) => {
+              if (s.date < weekStart || s.date > weekEnd) return "";
+              if (s.date < event.start || s.date > event.end) return "";
+              const pos = diffDays(new Date(weekStart), new Date(s.date));
+              if (pos < 0 || pos > 6) return "";
+              if (!weekDays[pos] || !weekDays[pos].inMonth) return "";
+              const left = ((pos + 0.5) / 7) * 100;
+              const top = laneIndex * 32 + 16;
+              const title = `セミナー ${formatDate(s.date)}`;
+              return `<span class="week-seminar-dot" style="left:${left}%;top:${top}px" title="${title}">S</span>`;
+            })
+            .join("");
+        })
+        .join("");
+
       const dayCells = weekDays
         .map((day) => {
           return `
@@ -624,6 +762,7 @@ function renderMonth(year, month, events) {
           <div class="week-bars ${todayIdx >= 0 ? "has-today" : ""}" style="height:${barsHeight}px;--today-idx:${todayIdx}">
             ${todayIdx >= 0 ? '<div class="today-column"></div>' : ""}
             ${bars}
+            ${seminarMarks}
           </div>
         </div>
       `;
@@ -807,12 +946,13 @@ function normalizeEvent(input) {
   const targetList = Array.isArray(input.targetList)
     ? input.targetList.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim())
     : [];
+  const seminars = normalizeSeminars(input.seminars);
 
   if (!name || !isIsoDate(start) || !isIsoDate(end) || !isIsoDate(interview)) return null;
   if (start > end) return null;
   if (interview < start || interview > end) return null;
 
-  return { id, name, start, end, interview, fill, ink, targetList };
+  return { id, name, start, end, interview, fill, ink, targetList, seminars };
 }
 
 function isIsoDate(value) {
@@ -824,3 +964,4 @@ function diffDays(fromDate, toDate) {
   const toUtc = Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
   return Math.floor((toUtc - fromUtc) / 86400000);
 }
+

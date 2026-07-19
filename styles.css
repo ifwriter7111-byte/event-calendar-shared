@@ -476,6 +476,90 @@ button.danger {
   border-radius: 6px;
 }
 
+/* 一覧が横に広がっても、ページ全体ではなく表だけ横スクロールさせる */
+#eventList {
+  overflow-x: auto;
+}
+
+/* ===== セミナー実施日時 ===== */
+.seminar-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.seminar-row input {
+  width: auto;
+  margin-top: 0;
+  padding: 6px;
+  border: 1px solid #c9d8c5;
+  border-radius: 6px;
+}
+
+.seminar-row .seminar-date {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.seminar-row .seminar-time {
+  flex: 0 0 108px;
+}
+
+.seminar-chip {
+  display: inline-block;
+  background: #e7effa;
+  border: 1px solid #cbd9ee;
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin: 1px 2px;
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.seminar-cell {
+  max-width: 240px;
+}
+
+.editable-seminar {
+  cursor: pointer;
+  display: inline-block;
+  min-width: 44px;
+}
+
+.editable-seminar:hover {
+  outline: 2px solid #bfe0bb;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.seminar-edit-name {
+  font-weight: 600;
+  margin-bottom: 10px;
+  padding: 5px 9px;
+  background: #f2f7f1;
+  border-radius: 6px;
+}
+
+/* カレンダー上のセミナー印。帯の上に小さな青い「S」バッジを置く（時刻は出さない） */
+.week-seminar-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #3f6fb0;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  z-index: 3;
+  cursor: default;
+  box-shadow: 0 0 0 1px #fff;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
