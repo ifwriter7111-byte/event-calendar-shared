@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ローンチスケジュール</title>
-  <link rel="stylesheet" href="./styles.css?v=20260719-4" />
+  <link rel="stylesheet" href="./styles.css?v=20260719-5" />
 </head>
 <body>
   <main class="container">
@@ -47,12 +47,18 @@
         <label>面談開始日
           <input id="interview" type="date" required />
         </label>
-        <label>セミナー実施日時 <span class="field-note">※任意・複数可（第1回・第2回…）</span></label>
+        <label>セミナー日時 <span class="field-note">※任意・複数可（第1回・第2回…）</span></label>
         <div id="seminarListContainer"></div>
         <button type="button" id="addSeminarRow" class="secondary btn-small">＋ 日時を追加</button>
         <label>対象リスト <span class="field-note">※複数の場合は、リストを追加してください。</span></label>
         <div id="targetListContainer"></div>
         <button type="button" id="addTargetRow" class="secondary btn-small">＋ リスト追加</button>
+        <label>配信対象オプチャ <span class="field-note">※複数の場合は、リストを追加してください。</span></label>
+        <div id="optchatListContainer"></div>
+        <button type="button" id="addOptchatRow" class="secondary btn-small">＋ リスト追加</button>
+        <label>訴求 <span class="field-note">※複数の場合は、リストを追加してください。</span></label>
+        <div id="appealListContainer"></div>
+        <button type="button" id="addAppealRow" class="secondary btn-small">＋ リスト追加</button>
         <label>帯の背景色
           <input id="fill" type="color" value="#dff4dc" />
         </label>
@@ -67,7 +73,7 @@
 
   <div id="seminarModal" class="modal-overlay hidden">
     <div class="modal-box">
-      <h3>セミナー実施日時</h3>
+      <h3>セミナー日時</h3>
       <div id="seminarEditName" class="seminar-edit-name"></div>
       <div id="seminarEditContainer"></div>
       <button type="button" id="seminarEditAddRow" class="secondary btn-small">＋ 日時を追加</button>
@@ -78,6 +84,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=20260719-4"></script>
+  <script type="module" src="./app.js?v=20260719-5"></script>
 </body>
 </html>

@@ -65,6 +65,8 @@ body {
 }
 
 /* 一覧に表示する対象リストのチップ */
+/* 通常は1行のまま。入りきらない長い名前のときだけ折り返して、
+   隣の列にはみ出して「＋ 追加」と被らないようにする。 */
 .target-chip {
   display: inline-block;
   background: #eef4ed;
@@ -73,11 +75,27 @@ body {
   padding: 1px 8px;
   margin: 1px 2px;
   font-size: 12px;
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
+/* チップ項目の列。狭くなりすぎて「＋ 追加」が潰れないよう下限を持たせる */
 .target-cell {
   max-width: 240px;
+  min-width: 116px;
+}
+
+/* 対象リストは項目数が多いので広めに取り、行が縦に伸びるのを防ぐ */
+.chip-targetList {
+  min-width: 220px;
+}
+
+/* 追加した2列は「＋ 追加」やチップが窮屈にならない幅を確保 */
+.chip-optchats,
+.chip-appeals {
+  min-width: 124px;
 }
 
 .editable-target {
@@ -131,6 +149,7 @@ body {
   cursor: pointer;
 }
 
+/* 見出しを折り返さないことで、ソートの▲▽が必ず見出しの右隣に揃う */
 .sort-trigger {
   border: 0;
   background: transparent;
@@ -139,6 +158,7 @@ body {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .sort-mark {
@@ -156,8 +176,16 @@ body {
   opacity: 0.55;
 }
 
+/* ローンチ名の列。バッジは折り返さないので、列は一番長い名前に自動で合う */
+.name-cell {
+  white-space: nowrap;
+}
+
+/* 名前は折り返さず1行にする。バッジが行ごとに分かれたり、
+   短い行の右に背景だけの余白が出たりしないようにするため。 */
 .name-badge {
   display: inline-block;
+  white-space: nowrap;
   padding: 2px 8px;
   border-radius: 999px;
   font-weight: 600;
@@ -193,9 +221,13 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* 文字幅ぴったりに詰める（固定幅で右に空白が出ないように）。下線も文字の下だけ。 */
 .period-date {
-  display: inline-block;
-  min-width: 74px;
+  border-bottom: 0;
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: #9db69a;
+  text-underline-offset: 3px;
 }
 
 .period-sep {
@@ -205,13 +237,15 @@ body {
 }
 
 .check-cell {
-  width: 64px;
+  width: 76px;
   text-align: center;
 }
 
+/* 「削除」が2行に折り返して縦積みにならないようにする */
 .row-delete {
   padding: 3px 10px;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .list-actions {
@@ -476,7 +510,14 @@ button.danger {
   border-radius: 6px;
 }
 
-/* 一覧が横に広がっても、ページ全体ではなく表だけ横スクロールさせる */
+/* 一覧が横に広がっても、ページ全体ではなく表だけ横スクロールさせる。
+   grid の子は既定で min-width:auto のため縮まず、ページごと横に伸びてしまう。
+   min-width:0 を与えて、はみ出し分を #eventList の中だけでスクロールさせる。 */
+.layout > *,
+.left-pane > * {
+  min-width: 0;
+}
+
 #eventList {
   overflow-x: auto;
 }
@@ -506,13 +547,15 @@ button.danger {
   flex: 0 0 108px;
 }
 
+/* 1件ずつ改行して、左端をまっすぐ縦に揃える */
 .seminar-chip {
-  display: inline-block;
+  display: block;
+  width: fit-content;
   background: #e7effa;
   border: 1px solid #cbd9ee;
   border-radius: 999px;
-  padding: 1px 8px;
-  margin: 1px 2px;
+  padding: 1px 6px;
+  margin: 2px 0;
   font-size: 12px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -522,10 +565,10 @@ button.danger {
   max-width: 240px;
 }
 
+/* 文字幅に合わせる（min-widthで余計な空きを作らない） */
 .editable-seminar {
   cursor: pointer;
   display: inline-block;
-  min-width: 44px;
 }
 
 .editable-seminar:hover {

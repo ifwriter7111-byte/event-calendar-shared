@@ -2,6 +2,14 @@ const STORAGE_KEY = "schedule-events-v3";
 const LIST_SORT_KEY = "schedule-list-sort-v3";
 const NAME_HISTORY_KEY = "schedule-name-history-v1";
 
+// 複数チップで入力する項目の定義。ここに足せば一覧・フォーム・保存がまとめて対応する。
+// headerHtml は一覧見出しの改行位置を指定するため（未指定なら label をそのまま使う）。
+const CHIP_FIELDS = [
+  { field: "targetList", label: "対象リスト", container: "#targetListContainer", addButton: "#addTargetRow", placeholder: "対象を入力" },
+  { field: "optchats", label: "配信対象オプチャ", headerHtml: "配信対象<br>オプチャ", container: "#optchatListContainer", addButton: "#addOptchatRow", placeholder: "オプチャ名を入力" },
+  { field: "appeals", label: "訴求", container: "#appealListContainer", addButton: "#addAppealRow", placeholder: "訴求を入力" }
+];
+
 // 共有バックエンド（Googleスプレッドシート）のURL。
 // 空 "" にすると、この端末だけに保存する従来モードになる。
 const API_URL = "https://script.google.com/macros/s/AKfycbxNLee4rbCM7qU5Ex3AmTixeksqlJ0kBxS0R2wk-HhxflRC-spTia7knEcFYuvzIhj96g/exec";
@@ -30,10 +38,19 @@ let seminarEditingId = null;
 const form = document.querySelector("#eventForm");
 
 form.addEventListener("submit", onSubmit);
+// 追加フォームでも、漢字変換中のEnterで送信されてしまわないようにする。
+form.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.isComposing || e.keyCode === 229)) {
+    e.preventDefault();
+  }
+});
 document.querySelector("#openAddButton").addEventListener("click", openAddModal);
 document.querySelector("#addCancel").addEventListener("click", closeAddModal);
 document.querySelector("#addReset").addEventListener("click", clearForm);
-document.querySelector("#addTargetRow").addEventListener("click", () => addTargetRow(""));
+CHIP_FIELDS.forEach((cf) => {
+  const button = document.querySelector(cf.addButton);
+  if (button) button.addEventListener("click", () => addChipRow(document.querySelector(cf.container), "", cf.placeholder));
+});
 document.querySelector("#addModal").addEventListener("click", (e) => {
   if (e.target.id === "addModal") closeAddModal();
 });
@@ -77,7 +94,10 @@ function collectFormValues() {
   const interview = document.querySelector("#interview").value;
   const fill = document.querySelector("#fill").value;
   const ink = "#000000";
-  const targetList = collectTargetList();
+  const chips = {};
+  CHIP_FIELDS.forEach((cf) => {
+    chips[cf.field] = collectChipList(document.querySelector(cf.container));
+  });
   const seminars = collectSeminars(document.querySelector("#seminarListContainer"));
 
   if (!name || !start || !end || !interview) return null;
@@ -89,13 +109,13 @@ function collectFormValues() {
     alert("面談開始日は開始日〜終了日の範囲にしてください。");
     return null;
   }
-  return { name, start, end, interview, fill, ink, targetList, seminars };
+  return { name, start, end, interview, fill, ink, ...chips, seminars };
 }
 
 function clearForm() {
   form.reset();
   document.querySelector("#fill").value = "#dff4dc";
-  resetTargetRows();
+  CHIP_FIELDS.forEach((cf) => resetChipRows(document.querySelector(cf.container), [], cf.placeholder));
   resetSeminarRows(document.querySelector("#seminarListContainer"), []);
 }
 
@@ -110,16 +130,16 @@ function closeAddModal() {
   document.querySelector("#addModal").classList.add("hidden");
 }
 
-// ===== 対象リスト（複数入力） =====
+// ===== チップ入力（対象リスト・配信対象オプチャ・訴求で共用） =====
 
-function addTargetRow(value) {
-  const container = document.querySelector("#targetListContainer");
+function addChipRow(container, value, placeholder) {
+  if (!container) return;
   const row = document.createElement("div");
   row.className = "target-row";
   const input = document.createElement("input");
   input.type = "text";
   input.className = "target-input";
-  input.placeholder = "対象を入力";
+  input.placeholder = placeholder || "入力";
   input.value = value || "";
   const remove = document.createElement("button");
   remove.type = "button";
@@ -127,22 +147,21 @@ function addTargetRow(value) {
   remove.textContent = "×";
   remove.addEventListener("click", () => {
     row.remove();
-    if (!container.querySelector(".target-row")) addTargetRow("");
+    if (!container.querySelector(".target-row")) addChipRow(container, "", placeholder);
   });
   row.appendChild(input);
   row.appendChild(remove);
   container.appendChild(row);
 }
 
-function resetTargetRows(values) {
-  const container = document.querySelector("#targetListContainer");
+function resetChipRows(container, values, placeholder) {
   if (!container) return;
   container.innerHTML = "";
   const list = Array.isArray(values) && values.length ? values : [""];
-  list.forEach((v) => addTargetRow(v));
+  list.forEach((v) => addChipRow(container, v, placeholder));
 }
 
-// 「、」「,」やスペース（全角・半角）で区切られた入力を、別々のリスト名に分ける。
+// 「、」「,」やスペース（全角・半角）で区切られた入力を、別々の名前に分ける。
 function splitTargetInput(value) {
   return String(value || "")
     .split(/[、,\s]+/)
@@ -150,12 +169,13 @@ function splitTargetInput(value) {
     .filter(Boolean);
 }
 
-function collectTargetList() {
-  return [...document.querySelectorAll("#targetListContainer .target-input")]
+function collectChipList(container) {
+  if (!container) return [];
+  return [...container.querySelectorAll(".target-input")]
     .flatMap((i) => splitTargetInput(i.value));
 }
 
-// ===== セミナー実施日時（日付＋時刻・複数入力） =====
+// ===== セミナー日時（日付＋時刻・複数入力） =====
 
 function addSeminarRow(container, date, time) {
   if (!container) return;
@@ -227,7 +247,20 @@ function renderTargetChips(list) {
     .join("");
 }
 
-// セミナー実施日時を小さなチップで表示する（例: 7/19(日) 14:00）。
+// ローンチ名の表示。バッジは折り返さない（CSS側で nowrap）ので、ここでは記号を安全に整えるだけ。
+function renderLaunchName(name) {
+  return String(name || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// チップ項目の一覧セル。未入力なら「＋ 追加」を出す。
+function renderChipCell(list) {
+  return (Array.isArray(list) && list.length) ? renderTargetChips(list) : '<span class="target-placeholder">＋ 追加</span>';
+}
+
+// セミナー日時を小さなチップで表示する（例: 7/19(日) 14:00）。
 function renderSeminarChips(list) {
   if (!Array.isArray(list) || list.length === 0) return '<span class="target-placeholder">＋ 追加</span>';
   return list
@@ -312,15 +345,15 @@ function renderEventList() {
       return `
       <tr data-id="${event.id}">
         <td class="check-cell"><button type="button" class="danger row-delete" data-id="${event.id}">削除</button></td>
-        <td><span class="name-badge editable-name" data-id="${event.id}" title="クリックで名前を変更" style="background:${event.fill};color:${event.ink}">${event.name}</span></td>
+        <td class="name-cell"><span class="name-badge editable-name" data-id="${event.id}" title="クリックで名前を変更" style="background:${event.fill};color:${event.ink}">${renderLaunchName(event.name)}</span></td>
         <td class="period-cell">
           <span class="editable-date period-date" data-id="${event.id}" data-field="start" data-value="${event.start}" title="クリックで変更">${formatDateWithWeekday(event.start)}</span>
           <span class="period-sep">〜</span>
           <span class="editable-date period-date" data-id="${event.id}" data-field="end" data-value="${event.end}" title="クリックで変更">${formatDateWithWeekday(event.end)}</span>
         </td>
-        <td class="seminar-cell"><span class="editable-seminar" data-id="${event.id}" title="クリックでセミナー実施日時を編集">${renderSeminarChips(event.seminars)}</span></td>
+        <td class="seminar-cell"><span class="editable-seminar" data-id="${event.id}" title="クリックでセミナー日時を編集">${renderSeminarChips(event.seminars)}</span></td>
         <td><span class="editable-date" data-id="${event.id}" data-field="interview" data-value="${event.interview}" title="クリックで変更">${formatDateWithWeekday(event.interview)}</span></td>
-        <td class="target-cell"><span class="editable-target" data-id="${event.id}" title="クリックで対象リストを編集">${(event.targetList && event.targetList.length) ? renderTargetChips(event.targetList) : '<span class="target-placeholder">＋ 追加</span>'}</span></td>
+        ${CHIP_FIELDS.map((cf) => `<td class="target-cell chip-${cf.field}"><span class="editable-target" data-id="${event.id}" data-field="${cf.field}" title="クリックで${cf.label}を編集">${renderChipCell(event[cf.field])}</span></td>`).join("")}
       </tr>`;
     })
     .join("");
@@ -338,7 +371,7 @@ function renderEventList() {
           </th>
           <th>
             <button type="button" class="sort-trigger" data-sort-key="seminars">
-              セミナー実施日時 <span class="sort-mark">${sortMark("seminars")}</span>
+              セミナー日時 <span class="sort-mark">${sortMark("seminars")}</span>
             </button>
           </th>
           <th>
@@ -346,7 +379,7 @@ function renderEventList() {
               面談開始 <span class="sort-mark">${sortMark("interview")}</span>
             </button>
           </th>
-          <th>対象リスト</th>
+          ${CHIP_FIELDS.map((cf) => `<th class="chip-${cf.field}">${cf.headerHtml || cf.label}</th>`).join("")}
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -382,7 +415,7 @@ function renderEventList() {
   });
 }
 
-// 一覧のセミナー実施日時セルをクリック → ポップアップで複数の日時を編集。
+// 一覧のセミナー日時セルをクリック → ポップアップで複数の日時を編集。
 function openSeminarModal(id) {
   const event = state.events.find((e) => e.id === id);
   if (!event) return;
@@ -411,11 +444,37 @@ async function saveSeminarModal() {
   await updateEventField(id, "seminars", list);
 }
 
-// 一覧の対象リストをその場で編集（クリック→「、」やスペース区切りで入力→保存）。
+// 日本語入力(IME)対応のEnter処理。
+// 漢字変換中／変換を確定した直後のEnterは「漢字の確定」なので入力を終わらせない。
+// 変換が終わったあとに押されたEnterだけを、入力の確定として扱う。
+function attachImeSafeEnter(input) {
+  let composing = false;
+  let composedAt = 0;
+  input.addEventListener("compositionstart", () => {
+    composing = true;
+  });
+  input.addEventListener("compositionend", () => {
+    composing = false;
+    composedAt = Date.now();
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    // e.isComposing / keyCode 229 は変換中のEnter。ブラウザによって
+    // compositionend が keydown より先に来るため、直後の数十msも除外する。
+    if (composing || e.isComposing || e.keyCode === 229) return;
+    if (Date.now() - composedAt < 100) return;
+    e.preventDefault();
+    input.blur();
+  });
+}
+
+// 一覧のチップ項目（対象リスト・配信対象オプチャ・訴求）をその場で編集。
+// クリック→「、」やスペース区切りで入力→保存。
 function startInlineTargetEdit(span) {
   const id = span.dataset.id;
+  const field = span.dataset.field;
   const event = state.events.find((e) => e.id === id);
-  const current = event && Array.isArray(event.targetList) ? event.targetList.join("、") : "";
+  const current = event && Array.isArray(event[field]) ? event[field].join("、") : "";
   const input = document.createElement("input");
   input.type = "text";
   input.className = "inline-edit-input inline-target-input";
@@ -430,20 +489,15 @@ function startInlineTargetEdit(span) {
     done = true;
     inlineEditingActive = false;
     const newList = splitTargetInput(input.value);
-    const before = event && Array.isArray(event.targetList) ? event.targetList : [];
+    const before = event && Array.isArray(event[field]) ? event[field] : [];
     if (JSON.stringify(before) === JSON.stringify(newList)) {
       renderEventList();
       return;
     }
-    await updateEventField(id, "targetList", newList);
+    await updateEventField(id, field, newList);
   };
   input.addEventListener("blur", commit);
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      input.blur();
-    }
-  });
+  attachImeSafeEnter(input);
   input.addEventListener("mousedown", (e) => e.stopPropagation());
 }
 
@@ -508,12 +562,7 @@ function startInlineNameEdit(span) {
     await updateEventField(id, "name", newVal);
   };
   input.addEventListener("blur", commit);
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      input.blur();
-    }
-  });
+  attachImeSafeEnter(input);
   input.addEventListener("mousedown", (e) => e.stopPropagation());
 }
 
@@ -531,7 +580,7 @@ async function updateEventField(id, field, value) {
     return false;
   }
   await persist(
-    { action: "update", event: { id, name: updated.name, start: updated.start, end: updated.end, interview: updated.interview, fill: updated.fill, targetList: updated.targetList || [], seminars: updated.seminars || [] } },
+    { action: "update", event: { id, name: updated.name, start: updated.start, end: updated.end, interview: updated.interview, fill: updated.fill, targetList: updated.targetList || [], optchats: updated.optchats || [], appeals: updated.appeals || [], seminars: updated.seminars || [] } },
     () => {
       state.events = state.events.map((e) => (e.id === id ? updated : e));
     }
@@ -553,7 +602,7 @@ function getActiveEvents() {
 
 function getListRows() {
   const source = getActiveEvents();
-  // 期間(start)・面談開始(interview)・セミナー実施日時(seminars)のいずれかで整列。
+  // 期間(start)・面談開始(interview)・セミナー日時(seminars)のいずれかで整列。
   const key = ["start", "interview", "seminars"].includes(state.listSort.key) ? state.listSort.key : "interview";
   const dir = state.listSort.dir === "desc" ? -1 : 1;
   // 並べ替え用の値。seminarsは最も早い実施日時、未設定は空文字。
@@ -561,7 +610,7 @@ function getListRows() {
   return source.sort((a, b) => {
     const av = valueOf(a);
     const bv = valueOf(b);
-    // セミナー実施日時が未設定のイベントは、昇順・降順どちらでも末尾にまとめる。
+    // セミナー日時が未設定のイベントは、昇順・降順どちらでも末尾にまとめる。
     if (key === "seminars" && av !== bv && (!av || !bv)) return av ? -1 : 1;
     const primary = av.localeCompare(bv) * dir;
     if (primary !== 0) return primary;
@@ -574,7 +623,7 @@ function getListRows() {
   });
 }
 
-// 並べ替え用に、そのイベントの最も早いセミナー実施日時を返す（未設定は ""）。
+// 並べ替え用に、そのイベントの最も早いセミナー日時を返す（未設定は ""）。
 function seminarSortValue(event) {
   if (!Array.isArray(event.seminars) || event.seminars.length === 0) return "";
   const s = event.seminars[0]; // normalizeSeminarsで昇順ソート済み＝先頭が最早
@@ -940,16 +989,20 @@ function normalizeEvent(input) {
   const interview = typeof input.interview === "string" ? input.interview : "";
   const fill = typeof input.fill === "string" && input.fill ? input.fill : "#dff4dc";
   const ink = typeof input.ink === "string" && input.ink ? input.ink : "#255725";
-  const targetList = Array.isArray(input.targetList)
-    ? input.targetList.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim())
-    : [];
+  // チップ項目（対象リスト・配信対象オプチャ・訴求）をまとめて整える。
+  const chips = {};
+  CHIP_FIELDS.forEach((cf) => {
+    chips[cf.field] = Array.isArray(input[cf.field])
+      ? input[cf.field].filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim())
+      : [];
+  });
   const seminars = normalizeSeminars(input.seminars);
 
   if (!name || !isIsoDate(start) || !isIsoDate(end) || !isIsoDate(interview)) return null;
   if (start > end) return null;
   if (interview < start || interview > end) return null;
 
-  return { id, name, start, end, interview, fill, ink, targetList, seminars };
+  return { id, name, start, end, interview, fill, ink, ...chips, seminars };
 }
 
 function isIsoDate(value) {
